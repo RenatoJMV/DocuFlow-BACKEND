@@ -38,10 +38,9 @@ class SecurityConfig {
             "https://docuflow-frontend.onrender.com"
         )
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("Authorization", "Content-Type")
+        configuration.allowedHeaders = listOf("*")
         configuration.allowCredentials = true
-        configuration.exposedHeaders = listOf("Authorization") // 🔥 si necesitas leer el token desde headers
-
+        configuration.exposedHeaders = listOf("Authorization")
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/**", configuration)
         return source
