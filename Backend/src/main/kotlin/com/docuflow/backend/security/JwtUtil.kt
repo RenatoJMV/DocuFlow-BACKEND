@@ -5,7 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import java.util.*
 
 object JwtUtil {
-    private const val SECRET = "mi_clave_secreta" // ⚠️ Mejor usar variable de entorno
+    private val SECRET = System.getenv("JWT_SECRET") ?: throw IllegalStateException("JWT_SECRET no definido")
     private val algorithm = Algorithm.HMAC256(SECRET)
 
     fun generateToken(username: String): String {

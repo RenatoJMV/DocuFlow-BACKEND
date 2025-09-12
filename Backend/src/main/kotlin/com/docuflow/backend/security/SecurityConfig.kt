@@ -18,8 +18,8 @@ class SecurityConfig {
             .cors { } // habilitar CORS
             .authorizeHttpRequests {
                 it.requestMatchers("/login").permitAll()
-                it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // 🔥 permitir preflight
-                it.anyRequest().permitAll()
+                it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                it.anyRequest().authenticated()
             }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
@@ -37,7 +37,7 @@ class SecurityConfig {
             "https://holapex9.github.io"
         )
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("*")
+        configuration.allowedHeaders = listOf("Authorization", "Content-Type")
         configuration.allowCredentials = true
         configuration.exposedHeaders = listOf("Authorization") // 🔥 si necesitas leer el token desde headers
 

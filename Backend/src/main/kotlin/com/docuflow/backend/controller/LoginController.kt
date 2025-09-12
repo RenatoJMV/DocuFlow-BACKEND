@@ -13,7 +13,11 @@ class LoginController {
 
     @PostMapping
     fun login(@RequestBody request: LoginRequest): ResponseEntity<Map<String, String>> {
-        if (request.username == "estudiante" && request.password == "123456") {
+        // Obtén usuario y contraseña desde variables de entorno
+        val userEnv = System.getenv("APP_USER") ?: "estudiante"
+        val passEnv = System.getenv("APP_PASS") ?: "123456"
+
+        if (request.username == userEnv && request.password == passEnv) {
             val token = JwtUtil.generateToken(request.username)
             return ResponseEntity.ok(mapOf("token" to token))
         }
