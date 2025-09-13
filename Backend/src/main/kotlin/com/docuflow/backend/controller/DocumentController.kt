@@ -34,7 +34,7 @@ class DocumentController(private val documentRepository: DocumentRepository) {
         }
     }
 
-    // 🟢 Descargar un archivo
+    // 🟢 Descargar un archivo desde Google Cloud Storage
     @GetMapping("/{id}/download")
     fun downloadFile(@PathVariable id: Long): ResponseEntity<Any> {
         val document = documentRepository.findById(id)
@@ -42,16 +42,32 @@ class DocumentController(private val documentRepository: DocumentRepository) {
             return ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado"))
         }
 
-        val file = File(document.get().filePath)
-        if (!file.exists()) {
-            return ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado físicamente"))
+        // Extraer bucket y nombre de archivo desde filePath (ej: gs://bucket/filename)
+        val filePath = document.get().filePath
+        val regex = Regex("""gs://([^/]+)/(.+)""")
+        val match = regex.matchEntire(filePath)
+        if (match == null) {
+            return ResponseEntity.status(500).body(mapOf("error" to "Ruta de archivo inválida"))
         }
+        val bucketName = match.groupValues[1]
+        val fileName = match.groupValues[2]
 
-        val resource = file.inputStream().readBytes()
+        val credentialsJson = System.getenv("GCP_KEY_JSON")
+        val storage: Storage = StorageOptions.newBuilder()
+            .setCredentials(ServiceAccountCredentials.fromStream(ByteArrayInputStream(credentialsJson.toByteArray())))
+            .build()
+            .service
+
+        val blob = storage.get(bucketName, fileName)
+        if (blob == null) {
+            return ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado en GCS"))
+        }
+        val fileBytes = blob.getContent()
+
         return ResponseEntity.ok()
-            .header("Content-Disposition", "attachment; filename=${document.get().filename}")
-            .header("Content-Type", document.get().fileType)
-            .body(resource)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${document.get().filename}\"")
+            .header(HttpHeaders.CONTENT_TYPE, document.get().fileType)
+            .body(fileBytes)
     }
 
     // 🟢 Eliminar un archivo
