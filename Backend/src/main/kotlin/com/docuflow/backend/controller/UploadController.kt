@@ -40,23 +40,22 @@ class UploadController {
             return ResponseEntity.badRequest().body(mapOf("error" to "Archivo demasiado grande"))
         }
 
-        // 3. Guardar físicamente en /uploads
-        val uploadDir = File("uploads")
-        if (!uploadDir.exists()) uploadDir.mkdirs()
-        val filePath = "uploads/${file.originalFilename}" // 👈 solo ruta relativa
-        file.transferTo(File(filePath))
+        // 3. Subir archivo a Google Cloud Storage
+        val bucketName = System.getenv("GCP_BUCKET_NAME")
+        val credentialsJson = System.getenv("GCP_KEY_JSON")
+        val gcsPath = GcsUtil.uploadFile(file, bucketName, credentialsJson)
 
         // 4. Guardar metadatos en la BD
         val document = Document(
             filename = file.originalFilename!!,
             fileType = file.contentType ?: "desconocido",
-            filePath = filePath,
+            filePath = gcsPath, // Guardamos la ruta de GCS
             size = file.size
-        )
-        documentRepository.save(document)
+            )
+            documentRepository.save(document)
 
-        println("Usuario $username subió ${file.originalFilename} (${file.size} bytes)")
+            println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
 
-        return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
+            return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
     }
 }
