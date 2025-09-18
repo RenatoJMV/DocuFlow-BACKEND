@@ -3,9 +3,11 @@ package com.docuflow.backend.controller
 import com.docuflow.backend.model.User
 import com.docuflow.backend.model.Comment
 import com.docuflow.backend.model.LogEntry
+import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.UserRepository
 import com.docuflow.backend.repository.CommentRepository
 import com.docuflow.backend.repository.LogEntryRepository
+import com.docuflow.backend.repository.DocumentRepository
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
 
@@ -14,7 +16,8 @@ import java.time.LocalDate
 class DashboardController(
     private val userRepository: UserRepository,
     private val commentRepository: CommentRepository,
-    private val logEntryRepository: LogEntryRepository
+    private val logEntryRepository: LogEntryRepository,
+    private val documentRepository: DocumentRepository // <--- nuevo
 ) {
 
     @GetMapping("/users")
@@ -33,4 +36,7 @@ class DashboardController(
             .count { it.action == "download" && it.timestamp.toLocalDate() == today }
         return mapOf("count" to count)
     }
+
+    @GetMapping("/files")
+    fun getAllFiles(): List<Document> = documentRepository.findAll()
 }
