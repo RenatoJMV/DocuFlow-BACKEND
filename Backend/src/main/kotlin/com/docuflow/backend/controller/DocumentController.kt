@@ -11,11 +11,10 @@ import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import java.io.ByteArrayInputStream
 import org.springframework.http.HttpHeaders
+import org.springframework.beans.factory.annotation.Autowired
 
 @RestController
 @RequestMapping("/files")
-import org.springframework.beans.factory.annotation.Autowired
-
 class DocumentController(
     private val documentRepository: DocumentRepository,
     @Autowired private val logEntryRepository: LogEntryRepository
