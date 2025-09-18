@@ -3,6 +3,8 @@ package com.docuflow.backend.controller
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.DocumentRepository
+import com.docuflow.backend.repository.LogEntryRepository
+import com.docuflow.backend.model.LogEntry
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -15,6 +17,9 @@ class UploadController {
 
     @Autowired
     lateinit var documentRepository: DocumentRepository
+
+    @Autowired
+    lateinit var logEntryRepository: LogEntryRepository
 
     @PostMapping
     fun uploadFile(
@@ -51,11 +56,21 @@ class UploadController {
             fileType = file.contentType ?: "desconocido",
             filePath = gcsPath, // Guardamos la ruta de GCS
             size = file.size
+        )
+        documentRepository.save(document)
+
+        // Guardar log de subida
+        logEntryRepository.save(
+            LogEntry(
+                action = "upload",
+                username = username,
+                documentId = document.id,
+                timestamp = java.time.LocalDateTime.now()
             )
-            documentRepository.save(document)
+        )
 
-            println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
+        println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
 
-            return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
+        return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
     }
 }

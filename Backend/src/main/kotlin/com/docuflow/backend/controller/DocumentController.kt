@@ -2,6 +2,8 @@ package com.docuflow.backend.controller
 
 import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.DocumentRepository
+import com.docuflow.backend.repository.LogEntryRepository
+import com.docuflow.backend.model.LogEntry
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.google.auth.oauth2.ServiceAccountCredentials
@@ -12,7 +14,12 @@ import org.springframework.http.HttpHeaders
 
 @RestController
 @RequestMapping("/files")
-class DocumentController(private val documentRepository: DocumentRepository) {
+import org.springframework.beans.factory.annotation.Autowired
+
+class DocumentController(
+    private val documentRepository: DocumentRepository,
+    @Autowired private val logEntryRepository: LogEntryRepository
+) {
 
     // 🟢 Listar todos los archivos
     @GetMapping
@@ -62,6 +69,16 @@ class DocumentController(private val documentRepository: DocumentRepository) {
         }
         val fileBytes = blob.getContent()
 
+        // Guardar log de descarga
+        logEntryRepository.save(
+            LogEntry(
+                action = "download",
+                username = "estudiante", // Cambia por el usuario real cuando tengas JWT aquí
+                documentId = document.get().id,
+                timestamp = java.time.LocalDateTime.now()
+            )
+        )
+
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${document.get().filename}\"")
             .header(HttpHeaders.CONTENT_TYPE, document.get().fileType)
@@ -73,6 +90,15 @@ class DocumentController(private val documentRepository: DocumentRepository) {
     fun deleteFile(@PathVariable id: Long): ResponseEntity<Map<String, String>> {
         return if (documentRepository.existsById(id)) {
             documentRepository.deleteById(id)
+            // Guardar log de eliminación
+            logEntryRepository.save(
+                LogEntry(
+                    action = "delete",
+                    username = "estudiante", // Cambia por el usuario real cuando tengas JWT aquí
+                    documentId = id,
+                    timestamp = java.time.LocalDateTime.now()
+                )
+            )
             ResponseEntity.ok(mapOf("mensaje" to "Archivo eliminado"))
         } else {
             ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado"))
