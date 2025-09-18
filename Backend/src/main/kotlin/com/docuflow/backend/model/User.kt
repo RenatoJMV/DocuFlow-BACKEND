@@ -16,5 +16,10 @@ data class User(
     val password: String,
 
     @Column(nullable = false)
-    val role: String = "colaborador" // o "admin"
+    var role: String = "colaborador", // o "admin"
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_permissions", joinColumns = [JoinColumn(name = "user_id")])
+    @Column(name = "permission")
+    var permissions: Set<String> = emptySet() // Ej: "descargar", "eliminar", "comentar", "inhabilitado"
 )
