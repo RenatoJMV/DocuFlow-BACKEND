@@ -1,3 +1,10 @@
+package com.docuflow.backend.controller
+
+import com.docuflow.backend.model.User
+import com.docuflow.backend.repository.UserRepository
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+
 @RestController
 @RequestMapping("/users")
 class UserManagementController(
