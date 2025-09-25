@@ -34,8 +34,8 @@ class FilesController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         val files = documentRepository.findAll().map { doc ->
-            mapOf(
-                "id" to doc.id,
+            mapOf<String, Any>(
+                "id" to (doc.id ?: 0L),
                 "filename" to doc.filename,
                 "fileType" to doc.fileType,
                 "size" to doc.size,
@@ -66,8 +66,8 @@ class FilesController(
         val document = documentRepository.findById(id).orElse(null)
             ?: return ResponseEntity.notFound().build()
 
-        val fileData = mapOf(
-            "id" to document.id,
+        val fileData = mapOf<String, Any>(
+            "id" to (document.id ?: 0L),
             "filename" to document.filename,
             "fileType" to document.fileType,
             "size" to document.size,
@@ -188,7 +188,7 @@ class FilesController(
 
         // Actualizar nombre si se proporciona
         val newFilename = updateData["filename"] as? String
-        if (newFilename != null && newFilename.isNotBlank()) {
+        val updatedDocument = if (newFilename != null && newFilename.isNotBlank()) {
             val oldFile = File("uploads/${document.filename}")
             val newFile = File("uploads/$newFilename")
             
@@ -196,16 +196,18 @@ class FilesController(
                 oldFile.renameTo(newFile)
             }
             
-            document.filename = newFilename
-            documentRepository.save(document)
+            val updated = document.copy(filename = newFilename)
+            documentRepository.save(updated)
+        } else {
+            document
         }
 
-        val updatedFileData = mapOf(
-            "id" to document.id,
-            "filename" to document.filename,
-            "fileType" to document.fileType,
-            "size" to document.size,
-            "formattedSize" to formatFileSize(document.size)
+        val updatedFileData = mapOf<String, Any>(
+            "id" to (updatedDocument.id ?: 0L),
+            "filename" to updatedDocument.filename,
+            "fileType" to updatedDocument.fileType,
+            "size" to updatedDocument.size,
+            "formattedSize" to formatFileSize(updatedDocument.size)
         )
 
         return ResponseEntity.ok(updatedFileData)

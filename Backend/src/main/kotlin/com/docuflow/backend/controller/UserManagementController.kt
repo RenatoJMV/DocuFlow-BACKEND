@@ -25,8 +25,8 @@ class UserManagementController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         val users = userRepository.findAll().map { user ->
-            mapOf(
-                "id" to user.id,
+            mapOf<String, Any>(
+                "id" to (user.id ?: 0L),
                 "username" to user.username,
                 "email" to "${user.username}@docuflow.com", // Email simulado
                 "role" to (user.role ?: "viewer"),
@@ -55,8 +55,8 @@ class UserManagementController(
         val user = userRepository.findById(id).orElse(null)
             ?: return ResponseEntity.notFound().build()
 
-        val userData = mapOf(
-            "id" to user.id,
+        val userData = mapOf<String, Any>(
+            "id" to (user.id ?: 0L),
             "username" to user.username,
             "email" to "${user.username}@docuflow.com",
             "role" to (user.role ?: "viewer"),
@@ -139,13 +139,13 @@ class UserManagementController(
         user.permissions = getPermissionsForRole(newRole)
         userRepository.save(user)
 
-        return ResponseEntity.ok(mapOf(
+        return ResponseEntity.ok(mapOf<String, Any>(
             "success" to true, 
             "message" to "Rol actualizado correctamente",
-            "user" to mapOf(
-                "id" to user.id,
+            "user" to mapOf<String, Any>(
+                "id" to (user.id ?: 0L),
                 "username" to user.username,
-                "role" to user.role,
+                "role" to (user.role ?: "viewer"),
                 "permissions" to user.permissions
             )
         ))

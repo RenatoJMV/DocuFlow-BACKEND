@@ -54,9 +54,9 @@ class DashboardController(
             .sortedByDescending { it.timestamp }
             .take(20)
             .map { log ->
-                val document = documentRepository.findById(log.documentId).orElse(null)
-                mapOf(
-                    "id" to log.id,
+                val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                mapOf<String, Any>(
+                    "id" to (log.id ?: 0L),
                     "action" to log.action,
                     "username" to log.username,
                     "documentName" to (document?.filename ?: "Unknown"),
@@ -72,8 +72,8 @@ class DashboardController(
     @GetMapping("/users")
     fun getAllUsers(): ResponseEntity<List<Map<String, Any>>> {
         val users = userRepository.findAll().map { user ->
-            mapOf(
-                "id" to user.id,
+            mapOf<String, Any>(
+                "id" to (user.id ?: 0L),
                 "username" to user.username,
                 "email" to (user.username + "@docuflow.com"), // Temporal
                 "role" to "user", // Por ahora role básico
@@ -92,12 +92,12 @@ class DashboardController(
     @GetMapping("/logs")
     fun getAllLogs(): ResponseEntity<List<Map<String, Any>>> {
         val logs = logEntryRepository.findAll().map { log ->
-            val document = documentRepository.findById(log.documentId).orElse(null)
-            mapOf(
-                "id" to log.id,
+            val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+            mapOf<String, Any>(
+                "id" to (log.id ?: 0L),
                 "action" to log.action,
                 "username" to log.username,
-                "documentId" to log.documentId,
+                "documentId" to (log.documentId ?: 0L),
                 "documentName" to (document?.filename ?: "Unknown"),
                 "timestamp" to log.timestamp,
                 "level" to mapActionToLevel(log.action),
@@ -119,8 +119,8 @@ class DashboardController(
     @GetMapping("/files")
     fun getAllFiles(): ResponseEntity<List<Map<String, Any>>> {
         val files = documentRepository.findAll().map { doc ->
-            mapOf(
-                "id" to doc.id,
+            mapOf<String, Any>(
+                "id" to (doc.id ?: 0L),
                 "filename" to doc.filename,
                 "fileType" to doc.fileType,
                 "size" to doc.size,
