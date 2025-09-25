@@ -14,7 +14,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @RestController
-@RequestMapping("/dashboard")
+@RequestMapping("/api/dashboard")
 class DashboardController(
     private val userRepository: UserRepository,
     private val commentRepository: CommentRepository,
@@ -24,49 +24,67 @@ class DashboardController(
 
     @GetMapping("/stats")
     fun getDashboardStats(): ResponseEntity<Map<String, Any>> {
-        val totalFiles = documentRepository.count()
-        val totalUsers = userRepository.count()
-        val today = LocalDate.now()
-        val downloadsToday = logEntryRepository.findAll()
-            .count { it.action == "download" && it.timestamp.toLocalDate() == today }
-        
-        // Calcular tamaño total de archivos
-        val totalSize = documentRepository.findAll().sumOf { it.size }
-        val storageSizeFormatted = formatFileSize(totalSize)
-        
-        val stats = mapOf(
-            "totalFiles" to totalFiles,
-            "totalUsers" to totalUsers,
-            "downloadsToday" to downloadsToday,
-            "storageUsed" to storageSizeFormatted,
-            "pendingTasks" to commentRepository.findAll().count { 
-                it.content.contains("task") || it.content.contains("tarea") 
-            },
-            "totalComments" to commentRepository.count()
-        )
-        
-        return ResponseEntity.ok(stats)
+        try {
+            val totalFiles = documentRepository.count()
+            val totalUsers = userRepository.count()
+            val today = LocalDate.now()
+            val downloadsToday = logEntryRepository.findAll()
+                .count { it.action == "download" && it.timestamp.toLocalDate() == today }
+            
+            // Calcular tamaño total de archivos
+            val totalSize = documentRepository.findAll().sumOf { it.size }
+            val storageSizeFormatted = formatFileSize(totalSize)
+            
+            val stats: Map<String, Any> = mapOf(
+                "totalFiles" to totalFiles,
+                "totalUsers" to totalUsers,
+                "downloadsToday" to downloadsToday,
+                "storageUsed" to storageSizeFormatted,
+                "pendingTasks" to commentRepository.findAll().count { 
+                    it.content.contains("task") || it.content.contains("tarea") 
+                },
+                "totalComments" to commentRepository.count()
+            )
+            
+            return ResponseEntity.ok(stats)
+        } catch (e: Exception) {
+            // Devolver estadísticas por defecto en caso de error
+            val defaultStats: Map<String, Any> = mapOf(
+                "totalFiles" to 0,
+                "totalUsers" to 0, 
+                "downloadsToday" to 0,
+                "storageUsed" to "0 B",
+                "pendingTasks" to 0,
+                "totalComments" to 0
+            )
+            return ResponseEntity.ok(defaultStats)
+        }
     }
 
     @GetMapping("/activity")
     fun getRecentActivity(): ResponseEntity<List<Map<String, Any>>> {
-        val recentLogs = logEntryRepository.findAll()
-            .sortedByDescending { it.timestamp }
-            .take(20)
-            .map { log ->
-                val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
-                mapOf<String, Any>(
-                    "id" to (log.id ?: 0L),
-                    "action" to log.action,
-                    "username" to log.username,
-                    "documentName" to (document?.filename ?: "Unknown"),
-                    "timestamp" to log.timestamp,
-                    "status" to getActionStatus(log.action),
-                    "details" to getActionDetails(log.action, document?.filename)
-                )
-            }
-        
-        return ResponseEntity.ok(recentLogs)
+        try {
+            val recentLogs = logEntryRepository.findAll()
+                .sortedByDescending { it.timestamp }
+                .take(20)
+                .map { log ->
+                    val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                    mapOf<String, Any>(
+                        "id" to (log.id ?: 0L),
+                        "action" to log.action,
+                        "username" to log.username,
+                        "documentName" to (document?.filename ?: "Unknown"),
+                        "timestamp" to log.timestamp,
+                        "status" to getActionStatus(log.action),
+                        "details" to getActionDetails(log.action, document?.filename)
+                    )
+                }
+            
+            return ResponseEntity.ok(recentLogs)
+        } catch (e: Exception) {
+            // Devolver lista vacía en caso de error
+            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+        }
     }
 
     @GetMapping("/users")

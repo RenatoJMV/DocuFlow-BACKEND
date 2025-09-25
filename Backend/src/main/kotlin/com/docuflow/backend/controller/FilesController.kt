@@ -51,6 +51,54 @@ class FilesController(
         return ResponseEntity.ok(mapOf("files" to files))
     }
 
+    @GetMapping("/stats") 
+    fun getFilesStats(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        // Validar token
+        val token = authHeader?.removePrefix("Bearer ") 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+        
+        val username = JwtUtil.extractUsername(token) 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        try {
+            val totalFiles = documentRepository.count()
+            val totalSize = documentRepository.findAll()
+                .sumOf { it.size }
+
+            val fileTypes = documentRepository.findAll()
+                .groupBy { it.fileType }
+                .mapValues { it.value.size }
+
+            val stats: Map<String, Any> = mapOf(
+                "totalFiles" to totalFiles,
+                "totalSize" to totalSize, 
+                "totalSizeFormatted" to formatFileSize(totalSize),
+                "fileTypes" to fileTypes,
+                "lastUpdated" to LocalDateTime.now()
+            )
+
+            return ResponseEntity.ok(stats)
+        } catch (e: Exception) {
+            return ResponseEntity.status(500)
+                .body(mapOf("error" to "Error al obtener estadísticas de archivos"))
+        }
+    }
+
+    private fun formatFileSize(bytes: Long): String {
+        val units = arrayOf("B", "KB", "MB", "GB")
+        var size = bytes.toDouble()
+        var unitIndex = 0
+        
+        while (size >= 1024 && unitIndex < units.size - 1) {
+            size /= 1024
+            unitIndex++
+        }
+        
+        return "%.1f %s".format(size, units[unitIndex])
+    }
+
     @GetMapping("/{id}")
     fun getFileById(
         @PathVariable id: Long,
