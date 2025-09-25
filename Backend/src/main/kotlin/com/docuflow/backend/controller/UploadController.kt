@@ -5,6 +5,7 @@ import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.repository.LogEntryRepository
 import com.docuflow.backend.model.LogEntry
+import com.docuflow.backend.service.GcsUtil
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
