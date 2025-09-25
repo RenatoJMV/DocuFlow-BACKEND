@@ -59,7 +59,7 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val username = JwtUtil.extractUsername(token) 
+        val username = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
@@ -259,14 +259,6 @@ class FilesController(
         )
 
         return ResponseEntity.ok(updatedFileData)
-    }
-
-    private fun formatFileSize(bytes: Long): String {
-        if (bytes < 1024) return "$bytes B"
-        val k = 1024.0
-        val sizes = arrayOf("B", "KB", "MB", "GB", "TB")
-        val i = (Math.log(bytes.toDouble()) / Math.log(k)).toInt()
-        return String.format("%.1f %s", bytes / Math.pow(k, i.toDouble()), sizes[i])
     }
 
     private fun canPreview(fileType: String): Boolean {
