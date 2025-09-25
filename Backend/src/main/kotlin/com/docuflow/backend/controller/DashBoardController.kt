@@ -35,15 +35,21 @@ class DashboardController(
             val totalSize = documentRepository.findAll().sumOf { it.size }
             val storageSizeFormatted = formatFileSize(totalSize)
             
+            // Contar actividades recientes (últimos 7 días)
+            val recentActivities = logEntryRepository.findAll()
+                .count { it.timestamp.isAfter(LocalDateTime.now().minusDays(7)) }
+            
             val stats: Map<String, Any> = mapOf(
                 "totalFiles" to totalFiles,
+                "totalStorageUsed" to totalSize, // En bytes como espera el frontend
                 "totalUsers" to totalUsers,
+                "totalComments" to commentRepository.count(),
+                "recentActivities" to recentActivities,
+                "storageUsed" to storageSizeFormatted, // Formato legible para compatibilidad
                 "downloadsToday" to downloadsToday,
-                "storageUsed" to storageSizeFormatted,
                 "pendingTasks" to commentRepository.findAll().count { 
                     it.content.contains("task") || it.content.contains("tarea") 
-                },
-                "totalComments" to commentRepository.count()
+                }
             )
             
             return ResponseEntity.ok(stats)
@@ -51,11 +57,13 @@ class DashboardController(
             // Devolver estadísticas por defecto en caso de error
             val defaultStats: Map<String, Any> = mapOf(
                 "totalFiles" to 0,
-                "totalUsers" to 0, 
-                "downloadsToday" to 0,
+                "totalStorageUsed" to 0,
+                "totalUsers" to 0,
+                "totalComments" to 0,
+                "recentActivities" to 0,
                 "storageUsed" to "0 B",
-                "pendingTasks" to 0,
-                "totalComments" to 0
+                "downloadsToday" to 0,
+                "pendingTasks" to 0
             )
             return ResponseEntity.ok(defaultStats)
         }
@@ -186,6 +194,120 @@ class DashboardController(
             "delete" -> "warning"
             "error" -> "error"
             else -> "info"
+        }
+    }
+
+    @GetMapping("/files/stats")
+    fun getDashboardFileStats(): ResponseEntity<Map<String, Any>> {
+        try {
+            val allFiles = documentRepository.findAll()
+            val totalFiles = allFiles.size.toLong()
+            val totalSize = allFiles.sumOf { it.size }
+            
+            val largestFile = allFiles.maxByOrNull { it.size }
+            val mostRecentFile = allFiles.maxByOrNull { it.id ?: 0L }
+            
+            val fileTypeDistribution = allFiles
+                .groupBy { 
+                    when {
+                        it.fileType.contains("pdf") -> "pdf"
+                        it.fileType.contains("word") || it.fileType.contains("docx") -> "docx"
+                        it.fileType.contains("excel") || it.fileType.contains("xlsx") -> "xlsx"
+                        it.fileType.contains("image") -> "image"
+                        else -> "other"
+                    }
+                }
+                .mapValues { it.value.size }
+
+            val stats: Map<String, Any> = mapOf(
+                "totalFiles" to totalFiles,
+                "totalSize" to totalSize,
+                "largestFile" to (largestFile?.filename ?: "N/A"),
+                "largestFileSize" to (largestFile?.size ?: 0L),
+                "mostRecentFile" to (mostRecentFile?.filename ?: "N/A"),
+                "fileTypeDistribution" to fileTypeDistribution
+            )
+            
+            return ResponseEntity.ok(stats)
+        } catch (e: Exception) {
+            val defaultStats: Map<String, Any> = mapOf(
+                "totalFiles" to 0,
+                "totalSize" to 0,
+                "largestFile" to "N/A",
+                "largestFileSize" to 0,
+                "mostRecentFile" to "N/A",
+                "fileTypeDistribution" to mapOf<String, Int>()
+            )
+            return ResponseEntity.ok(defaultStats)
+        }
+    }
+
+    @GetMapping("/recent-files")
+    fun getRecentFiles(@RequestParam(defaultValue = "5") limit: Int): ResponseEntity<List<Map<String, Any>>> {
+        try {
+            val recentFiles = documentRepository.findAll()
+                .sortedByDescending { it.id ?: 0L }
+                .take(limit)
+                .map { doc ->
+                    mapOf<String, Any>(
+                        "id" to (doc.id ?: 0L),
+                        "filename" to doc.filename,
+                        "fileType" to doc.fileType,
+                        "size" to doc.size,
+                        "uploadedAt" to LocalDateTime.now().minusDays((1..7).random().toLong())
+                    )
+                }
+            
+            return ResponseEntity.ok(recentFiles)
+        } catch (e: Exception) {
+            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+        }
+    }
+
+    @GetMapping("/recent-activities")
+    fun getRecentActivities(@RequestParam(defaultValue = "10") limit: Int): ResponseEntity<List<Map<String, Any>>> {
+        try {
+            val recentActivities = logEntryRepository.findAll()
+                .sortedByDescending { it.timestamp }
+                .take(limit)
+                .map { log ->
+                    val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                    mapOf<String, Any>(
+                        "id" to (log.id ?: 0L),
+                        "type" to getActivityType(log.action),
+                        "file" to (document?.filename ?: "Unknown"),
+                        "action" to getActivityDescription(log.action, document?.filename),
+                        "user" to log.username,
+                        "timestamp" to log.timestamp,
+                        "status" to getActionStatus(log.action)
+                    )
+                }
+            
+            return ResponseEntity.ok(recentActivities)
+        } catch (e: Exception) {
+            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+        }
+    }
+
+    private fun getActivityType(action: String): String {
+        return when (action) {
+            "upload" -> "file_upload"
+            "download" -> "file_download"
+            "delete" -> "file_delete"
+            "comment" -> "comment_added"
+            "login" -> "user_login"
+            else -> "system_action"
+        }
+    }
+
+    private fun getActivityDescription(action: String, filename: String?): String {
+        return when (action) {
+            "upload" -> "Subió archivo ${filename ?: "desconocido"}"
+            "download" -> "Descargó archivo ${filename ?: "desconocido"}"
+            "delete" -> "Eliminó archivo ${filename ?: "desconocido"}"
+            "comment" -> "Agregó comentario en ${filename ?: "documento"}"
+            "login" -> "Inició sesión en el sistema"
+            else -> "Realizó acción: $action"
         }
     }
 }

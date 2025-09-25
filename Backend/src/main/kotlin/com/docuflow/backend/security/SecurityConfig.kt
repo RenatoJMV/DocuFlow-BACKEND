@@ -34,12 +34,13 @@ class SecurityConfig {
         configuration.allowedOriginPatterns = listOf(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
-            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3000", 
             "http://localhost:3000",
-            "https://touched-included-elephant.ngrok-free.app",
-            "https://holapex9.github.io",
+            "https://renatojmv.github.io",
             "https://docuflow-frontend.onrender.com",
-            "https://docuflow-frontend*.onrender.com"
+            "https://docuflow-frontend*.onrender.com",
+            "https://touched-included-elephant.ngrok-free.app",
+            "https://holapex9.github.io"
         )
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
         configuration.allowedHeaders = listOf("*")

@@ -99,6 +99,47 @@ class FilesController(
         return "%.1f %s".format(size, units[unitIndex])
     }
 
+    @GetMapping("/count")
+    fun getFilesCount(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ") 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+        
+        val username = JwtUtil.validateToken(token) 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        try {
+            val totalCount = documentRepository.count()
+            return ResponseEntity.ok(mapOf("count" to totalCount))
+        } catch (e: Exception) {
+            return ResponseEntity.status(500)
+                .body(mapOf("error" to "Error al obtener conteo de archivos"))
+        }
+    }
+
+    @GetMapping("/total-size")
+    fun getTotalSize(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ") 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+        
+        val username = JwtUtil.validateToken(token) 
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        try {
+            val totalSize = documentRepository.findAll().sumOf { it.size }
+            return ResponseEntity.ok(mapOf(
+                "totalSize" to totalSize,
+                "formattedSize" to formatFileSize(totalSize)
+            ))
+        } catch (e: Exception) {
+            return ResponseEntity.status(500)
+                .body(mapOf("error" to "Error al calcular tamaño total"))
+        }
+    }
+
     @GetMapping("/{id}")
     fun getFileById(
         @PathVariable id: Long,
