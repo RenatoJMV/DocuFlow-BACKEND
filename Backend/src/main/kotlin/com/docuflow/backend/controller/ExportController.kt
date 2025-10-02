@@ -29,7 +29,8 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val _ = JwtUtil.validateToken(token) 
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
@@ -103,7 +104,8 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val _ = JwtUtil.validateToken(token) 
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
@@ -151,7 +153,8 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val _ = JwtUtil.validateToken(token) 
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {

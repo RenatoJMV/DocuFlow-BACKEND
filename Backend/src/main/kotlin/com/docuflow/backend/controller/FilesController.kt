@@ -34,7 +34,8 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        val _ = JwtUtil.validateToken(token)
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val files = documentRepository.findAll()
@@ -98,7 +99,7 @@ class FilesController(
                     .body(mapOf<String, Any>("error" to "GCP_KEY_JSON no configurado"))
 
             // Subir archivo a Google Cloud Storage
-            val gcsPath = GcsUtil.uploadFile(file, bucketName, credentialsJson)
+            val gcsPath = GcsUtil.uploadFile(file, bucketName)
 
             // Guardar metadatos en la base de datos
             val document = Document(

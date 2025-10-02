@@ -27,7 +27,8 @@ class CommentController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
 
-        val _ = JwtUtil.validateToken(token) 
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         val comments = commentRepository.findAll().map { comment ->
@@ -115,7 +116,8 @@ class CommentController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
 
-        val _ = JwtUtil.validateToken(token) 
+        @Suppress("UNUSED_VARIABLE")
+        val validatedUser = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         val comments = commentRepository.findByDocumentId(documentId).map { comment ->

@@ -45,7 +45,7 @@ class UploadController {
             ?: return ResponseEntity.status(500).body(mapOf("error" to "Bucket no configurado"))
         val credentialsJson = System.getenv("GCP_KEY_JSON")
             ?: return ResponseEntity.status(500).body(mapOf("error" to "Credenciales no configuradas"))
-        val gcsPath = GcsUtil.uploadFile(file, bucketName, credentialsJson)
+        val gcsPath = GcsUtil.uploadFile(file, bucketName)
 
         // 4. Guardar metadatos en la BD
         val document = Document(
