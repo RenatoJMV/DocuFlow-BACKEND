@@ -21,7 +21,7 @@ class InitialDataSetup : CommandLineRunner {
             // Variables de entorno para el usuario admin inicial
             val adminUsername = System.getenv("ADMIN_USERNAME") ?: "admin"
             val adminPassword = System.getenv("ADMIN_PASSWORD") ?: "DocuFlow2025!"
-            val adminEmail = System.getenv("ADMIN_EMAIL") ?: "admin@docuflow.com"
+            val adminFullName = System.getenv("ADMIN_FULLNAME") ?: "Administrador del Sistema"
 
             // Verificar si ya existe un usuario admin
             val existingAdmin = userRepository.findByUsername(adminUsername)
@@ -32,8 +32,8 @@ class InitialDataSetup : CommandLineRunner {
                     username = adminUsername,
                     password = adminPassword, // En producción esto debería estar hasheado
                     role = "admin",
-                    email = adminEmail,
-                    permissions = arrayOf(
+                    fullName = adminFullName,
+                    permissions = setOf(
                         "download", "delete", "comment", "edit", "share", 
                         "admin", "view_logs", "manage_users", "export_data",
                         "manage_permissions", "manage_notifications"
@@ -43,7 +43,7 @@ class InitialDataSetup : CommandLineRunner {
                 userRepository.save(adminUser)
                 println("✅ Usuario admin inicial creado: $adminUsername")
                 println("🔑 Password: $adminPassword")
-                println("📧 Email: $adminEmail")
+                println("� Nombre: $adminFullName")
                 println("⚠️  IMPORTANTE: Cambia la contraseña después del primer login")
             } else {
                 println("ℹ️  Usuario admin ya existe: $adminUsername")
