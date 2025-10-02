@@ -21,6 +21,10 @@ class SecurityConfig {
             .authorizeHttpRequests {
                 it.requestMatchers("/login").permitAll()
                 it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                // Proteger todas las rutas /files
+                it.requestMatchers("/files/**").authenticated()
+                // Mantener compatibilidad con /documents por si aún se usa
+                it.requestMatchers("/documents/**").authenticated()
                 it.anyRequest().authenticated()
             }
             .httpBasic { it.disable() }

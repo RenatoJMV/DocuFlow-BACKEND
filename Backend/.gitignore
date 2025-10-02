@@ -34,3 +34,8 @@ build/
 
 ### .env files ###
 .env
+.env.local
+.env.production
+.env.development
+*.env
+application-local.properties
