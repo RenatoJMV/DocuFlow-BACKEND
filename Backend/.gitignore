@@ -39,3 +39,7 @@ build/
 .env.development
 *.env
 application-local.properties
+
+### Local run scripts (contain credentials) ###
+run-local.sh
+run-local.ps1
