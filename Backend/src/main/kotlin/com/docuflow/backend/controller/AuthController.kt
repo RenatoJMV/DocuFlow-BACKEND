@@ -34,7 +34,9 @@ class AuthController(
         private val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
         private val DEFAULT_VIEWER_PERMISSIONS = setOf("files.read", "files.download", "comments.read")
         private val DEFAULT_ADMIN_PERMISSIONS = setOf(
-            "download", "delete", "comment", "edit", "share", "admin", "view_logs", "manage_users"
+            "files.read", "files.upload", "files.download", "files.delete",
+            "tasks.complete", "comments.read", "comments.create", "comments.edit", "comments.delete",
+            "logs.view", "users.read", "users.create", "users.update", "users.delete", "users.permissions"
         )
     }
 
@@ -64,6 +66,10 @@ class AuthController(
             } else {
                 return errorResponse(HttpStatus.UNAUTHORIZED, "Credenciales inválidas", "Usuario o contraseña incorrectos")
             }
+        }
+
+        if (!user.active) {
+            return errorResponse(HttpStatus.FORBIDDEN, "La cuenta está deshabilitada")
         }
 
         val passwordMatches = passwordEncoder.matches(request.password, user.password) || user.password == request.password

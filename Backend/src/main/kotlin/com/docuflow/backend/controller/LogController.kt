@@ -38,15 +38,16 @@ class LogController(
             
             val paginatedLogs = if (startIndex < totalLogs) {
                 allLogs.subList(startIndex, endIndex).map { log ->
-                    val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                    val document = log.documentId?.let { documentRepository.findById(it).orElse(null) }
                     mapOf<String, Any>(
                         "id" to (log.id ?: 0L),
                         "action" to log.action,
                         "username" to log.username,
+                        "target" to (log.targetUsername ?: log.username),
                         "documentName" to (document?.filename ?: "N/A"),
                         "timestamp" to log.timestamp,
                         "level" to getLogLevel(log.action),
-                        "details" to getLogDetails(log.action, document?.filename)
+                        "details" to getLogDetails(log, document?.filename)
                     )
                 }
             } else {
@@ -87,15 +88,16 @@ class LogController(
                 .sortedByDescending { it.timestamp }
                 .take(limit)
                 .map { log ->
-                    val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                    val document = log.documentId?.let { documentRepository.findById(it).orElse(null) }
                     mapOf<String, Any>(
                         "id" to (log.id ?: 0L),
                         "action" to log.action,
                         "username" to log.username,
+                        "target" to (log.targetUsername ?: log.username),
                         "documentName" to (document?.filename ?: "N/A"),
                         "timestamp" to log.timestamp,
                         "level" to getLogLevel(log.action),
-                        "details" to getLogDetails(log.action, document?.filename)
+                        "details" to getLogDetails(log, document?.filename)
                     )
                 }
             
@@ -140,15 +142,16 @@ class LogController(
                 .filter { it.username == username }
                 .sortedByDescending { it.timestamp }
                 .map { log ->
-                    val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
+                    val document = log.documentId?.let { documentRepository.findById(it).orElse(null) }
                     mapOf<String, Any>(
                         "id" to (log.id ?: 0L),
                         "action" to log.action,
                         "username" to log.username,
+                        "target" to (log.targetUsername ?: log.username),
                         "documentName" to (document?.filename ?: "N/A"),
                         "timestamp" to log.timestamp,
                         "level" to getLogLevel(log.action),
-                        "details" to getLogDetails(log.action, document?.filename)
+                        "details" to getLogDetails(log, document?.filename)
                     )
                 }
             
@@ -158,25 +161,32 @@ class LogController(
         }
     }
 
-    private fun getLogLevel(action: String): String {
-        return when (action) {
-            "login", "upload" -> "info"
-            "download" -> "success"
-            "delete" -> "warning"
-            "error", "failed_login" -> "danger"
-            "comment" -> "info"
-            else -> "info"
-        }
+    private fun getLogLevel(action: String): String = when (action) {
+        "login", "upload", "comment", "user_create", "user_update", "user_permissions_update", "user_password_reset" -> "info"
+        "download" -> "success"
+        "delete", "user_delete" -> "warning"
+        "error", "failed_login" -> "danger"
+        else -> "info"
     }
 
-    private fun getLogDetails(action: String, filename: String?): String {
+    private fun getLogDetails(log: LogEntry, filename: String?): String {
+        if (!log.details.isNullOrBlank()) {
+            return log.details
+        }
+        val action = log.action
+        val target = log.targetUsername ?: log.username
         return when (action) {
-            "login" -> "Usuario autenticado exitosamente"
-            "upload" -> "Subió archivo: ${filename ?: "desconocido"}"
-            "download" -> "Descargó archivo: ${filename ?: "desconocido"}"
-            "delete" -> "Eliminó archivo: ${filename ?: "desconocido"}"
-            "comment" -> "Agregó comentario en: ${filename ?: "documento"}"
-            "failed_login" -> "Intento de login fallido"
+            "login" -> "Usuario ${log.username} autenticado exitosamente"
+            "upload" -> "${log.username} subió el archivo ${filename ?: "desconocido"}"
+            "download" -> "${log.username} descargó el archivo ${filename ?: "desconocido"}"
+            "delete" -> "${log.username} eliminó el archivo ${filename ?: "desconocido"}"
+            "comment" -> "${log.username} agregó un comentario"
+            "failed_login" -> "Intento de login fallido para ${log.username}"
+            "user_create" -> "${log.username} creó al usuario $target"
+            "user_update" -> "${log.username} actualizó al usuario $target"
+            "user_permissions_update" -> "${log.username} ajustó permisos de $target"
+            "user_password_reset" -> "${log.username} reinició la contraseña de $target"
+            "user_delete" -> "${log.username} eliminó la cuenta de $target"
             else -> "Acción realizada: $action"
         }
     }

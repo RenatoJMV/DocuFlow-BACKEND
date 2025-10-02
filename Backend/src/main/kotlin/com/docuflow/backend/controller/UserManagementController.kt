@@ -1,232 +1,168 @@
 package com.docuflow.backend.controller
 
+import com.docuflow.backend.dto.AdminUserCreateRequest
+import com.docuflow.backend.dto.AdminUserPasswordUpdateRequest
+import com.docuflow.backend.dto.AdminUserPermissionsRequest
+import com.docuflow.backend.dto.AdminUserUpdateRequest
 import com.docuflow.backend.model.User
-import com.docuflow.backend.repository.UserRepository
 import com.docuflow.backend.security.JwtUtil
+import com.docuflow.backend.service.AdminUserService
+import com.docuflow.backend.service.AdminUserService.AdminUserException
+import com.docuflow.backend.service.AdminUserService.Companion.ROLE_ADMIN
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.time.LocalDateTime
+import jakarta.validation.Valid
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping(value = ["/api/admin/users", "/users"])
 class UserManagementController(
-    private val userRepository: UserRepository
+    private val adminUserService: AdminUserService
 ) {
 
     @GetMapping
-    fun getAllUsers(
-        @RequestHeader("Authorization") authHeader: String?
-    ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val users = userRepository.findAll().map { user ->
-            mapOf<String, Any>(
-                "id" to (user.id ?: 0L),
-                "username" to user.username,
-                "name" to (user.fullName ?: user.username),
-                "email" to "${user.username}@docuflow.com", // Email simulado
-                "role" to (user.role ?: "viewer"),
-                "status" to "active",
-                "permissions" to user.permissions,
-                "lastLogin" to LocalDateTime.now().minusDays((1..30).random().toLong()),
-                "createdAt" to LocalDateTime.now().minusMonths((1..12).random().toLong())
-            )
+    fun listUsers(@RequestHeader("Authorization") authHeader: String?): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            val users = adminUserService.listUsers()
+            ok(mapOf("users" to users), admin)
         }
-
-        return ResponseEntity.ok(mapOf("success" to true, "users" to users))
     }
 
     @GetMapping("/{id}")
-    fun getUserById(
+    fun getUser(
         @PathVariable id: Long,
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val user = userRepository.findById(id).orElse(null)
-            ?: return ResponseEntity.notFound().build()
-
-        val userData = mapOf<String, Any>(
-            "id" to (user.id ?: 0L),
-            "username" to user.username,
-            "name" to (user.fullName ?: user.username),
-            "email" to "${user.username}@docuflow.com",
-            "role" to (user.role ?: "viewer"),
-            "status" to "active",
-            "permissions" to user.permissions,
-            "lastLogin" to LocalDateTime.now().minusDays((1..30).random().toLong()),
-            "createdAt" to LocalDateTime.now().minusMonths((1..12).random().toLong())
-        )
-
-        return ResponseEntity.ok(userData)
-    }
-
-    // Listar roles disponibles
-    @GetMapping("/roles")
-    fun getRoles(
-        @RequestHeader("Authorization") authHeader: String?
-    ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val roles = listOf(
-            mapOf(
-                "id" to "admin",
-                "name" to "Administrador",
-                "description" to "Acceso completo al sistema",
-                "permissions" to getAllPermissions()
-            ),
-            mapOf(
-                "id" to "editor",
-                "name" to "Editor",
-                "description" to "Puede editar documentos y comentarios",
-                "permissions" to listOf(
-                    "files.read", "files.upload", "files.edit", "files.delete",
-                    "comments.read", "comments.create", "comments.edit"
-                )
-            ),
-            mapOf(
-                "id" to "viewer",
-                "name" to "Visualizador",
-                "description" to "Solo puede ver documentos",
-                "permissions" to listOf("files.read", "comments.read")
-            ),
-            mapOf(
-                "id" to "guest",
-                "name" to "Invitado",
-                "description" to "Acceso limitado",
-                "permissions" to listOf("files.read")
-            )
-        )
-
-        return ResponseEntity.ok(mapOf("success" to true, "roles" to roles))
-    }
-
-    // Cambiar el rol de un usuario
-    @PutMapping("/{id}/role")
-    fun setUserRole(
-        @PathVariable id: Long, 
-        @RequestBody body: Map<String, String>,
-        @RequestHeader("Authorization") authHeader: String?
-    ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val user = userRepository.findById(id).orElse(null)
-            ?: return ResponseEntity.notFound().build()
-
-        val newRole = body["role"] ?: return ResponseEntity.badRequest()
-            .body(mapOf("error" to "Role no especificado"))
-
-        user.role = newRole
-        // Asignar permisos automáticamente según el rol
-        user.permissions = getPermissionsForRole(newRole)
-        userRepository.save(user)
-
-        return ResponseEntity.ok(mapOf<String, Any>(
-            "success" to true, 
-            "message" to "Rol actualizado correctamente",
-            "user" to mapOf<String, Any>(
-                "id" to (user.id ?: 0L),
-                "username" to user.username,
-                "name" to (user.fullName ?: user.username),
-                "role" to (user.role ?: "viewer"),
-                "permissions" to user.permissions
-            )
-        ))
-    }
-
-    // Obtener permisos de un usuario
-    @GetMapping("/{id}/permissions")
-    fun getUserPermissions(
-        @PathVariable id: Long,
-        @RequestHeader("Authorization") authHeader: String?
-    ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val user = userRepository.findById(id).orElse(null)
-            ?: return ResponseEntity.notFound().build()
-
-        return ResponseEntity.ok(mapOf(
-            "success" to true,
-            "permissions" to user.permissions,
-            "role" to user.role
-        ))
-    }
-
-    // Actualizar permisos de un usuario
-    @PutMapping("/{id}/permissions")
-    fun setUserPermissions(
-        @PathVariable id: Long, 
-        @RequestBody body: Map<String, List<String>>,
-        @RequestHeader("Authorization") authHeader: String?
-    ): ResponseEntity<Map<String, Any>> {
-        // Validar token
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
-
-        val user = userRepository.findById(id).orElse(null)
-            ?: return ResponseEntity.notFound().build()
-
-        val newPerms = body["permissions"] ?: return ResponseEntity.badRequest()
-            .body(mapOf("error" to "Permisos no especificados"))
-
-        user.permissions = newPerms.toSet()
-        userRepository.save(user)
-
-        return ResponseEntity.ok(mapOf(
-            "success" to true,
-            "message" to "Permisos actualizados correctamente",
-            "permissions" to user.permissions
-        ))
-    }
-
-    private fun getAllPermissions(): List<String> {
-        return listOf(
-            "files.read", "files.upload", "files.edit", "files.delete", "files.download",
-            "comments.read", "comments.create", "comments.edit", "comments.delete",
-            "users.read", "users.edit", "users.delete", "users.permissions",
-            "dashboard.read", "logs.read", "system.admin"
-        )
-    }
-
-    private fun getPermissionsForRole(role: String): Set<String> {
-        return when (role) {
-            "admin" -> getAllPermissions().toSet()
-            "editor" -> setOf(
-                "files.read", "files.upload", "files.edit", "files.delete", "files.download",
-                "comments.read", "comments.create", "comments.edit", "comments.delete",
-                "dashboard.read"
-            )
-            "viewer" -> setOf("files.read", "files.download", "comments.read", "dashboard.read")
-            "guest" -> setOf("files.read")
-            else -> setOf("files.read")
+        return withAdmin(authHeader) { admin ->
+            val user = adminUserService.getUser(id)
+            ok(mapOf("user" to user), admin)
         }
     }
+
+    @PostMapping
+    fun createUser(
+        @Valid @RequestBody request: AdminUserCreateRequest,
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            val created = adminUserService.createUser(request, admin)
+            ResponseEntity.status(HttpStatus.CREATED).body(
+                mutableMapOf(
+                    "success" to true,
+                    "message" to "Usuario creado correctamente",
+                    "user" to created
+                )
+            )
+        }
+    }
+
+    @PutMapping("/{id}")
+    fun updateUser(
+        @PathVariable id: Long,
+        @RequestBody request: AdminUserUpdateRequest,
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            val updated = adminUserService.updateUser(id, request, admin)
+            ok(
+                mapOf(
+                    "message" to "Usuario actualizado correctamente",
+                    "user" to updated
+                ),
+                admin
+            )
+        }
+    }
+
+    @PatchMapping("/{id}/password")
+    fun updatePassword(
+        @PathVariable id: Long,
+        @Valid @RequestBody request: AdminUserPasswordUpdateRequest,
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            adminUserService.updatePassword(id, request, admin)
+            ok(mapOf("message" to "Contraseña actualizada correctamente"), admin)
+        }
+    }
+
+    @PatchMapping("/{id}/permissions")
+    fun updatePermissions(
+        @PathVariable id: Long,
+        @RequestBody request: AdminUserPermissionsRequest,
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            val updated = adminUserService.updatePermissions(id, request, admin)
+            ok(
+                mapOf(
+                    "message" to "Permisos actualizados correctamente",
+                    "user" to updated
+                ),
+                admin
+            )
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    fun deleteUser(
+        @PathVariable id: Long,
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            adminUserService.deleteUser(id, admin)
+            ok(mapOf("message" to "Usuario eliminado correctamente"), admin)
+        }
+    }
+
+    @GetMapping("/roles")
+    fun listRoles(@RequestHeader("Authorization") authHeader: String?): ResponseEntity<Map<String, Any>> {
+        return withAdmin(authHeader) { admin ->
+            val roles = adminUserService.getRoles()
+            ok(mapOf("roles" to roles), admin)
+        }
+    }
+
+    private fun withAdmin(
+        authHeader: String?,
+        block: (admin: User) -> ResponseEntity<Map<String, Any>>
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return error(HttpStatus.UNAUTHORIZED, "Token faltante")
+
+        val username = JwtUtil.validateToken(token)
+            ?: return error(HttpStatus.UNAUTHORIZED, "Token inválido")
+
+        val admin = try {
+            adminUserService.ensureAdmin(username)
+        } catch (ex: AdminUserException.Authorization) {
+            return error(HttpStatus.FORBIDDEN, ex.message ?: "Acceso denegado")
+        }
+
+        return try {
+            block(admin)
+        } catch (ex: AdminUserException.Validation) {
+            error(HttpStatus.BAD_REQUEST, ex.message ?: "Solicitud inválida")
+        } catch (ex: AdminUserException.NotFound) {
+            error(HttpStatus.NOT_FOUND, ex.message ?: "Recurso no encontrado")
+        }
+    }
+
+    private fun ok(payload: Map<String, Any>, admin: User): ResponseEntity<Map<String, Any>> {
+        val response = mutableMapOf<String, Any>("success" to true)
+        response.putAll(payload)
+        response["performedBy"] = mapOf(
+            "username" to admin.username,
+            "role" to ROLE_ADMIN
+        )
+        return ResponseEntity.ok(response)
+    }
+
+    private fun error(status: HttpStatus, message: String): ResponseEntity<Map<String, Any>> =
+        ResponseEntity.status(status).body(
+            mapOf(
+                "success" to false,
+                "error" to message
+            )
+        )
 }

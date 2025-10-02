@@ -19,6 +19,12 @@ data class LogEntry(
     @Column(nullable = true)
     val documentId: Long? = null,
 
+    @Column(name = "target_username")
+    val targetUsername: String? = null,
+
+    @Column(columnDefinition = "TEXT")
+    val details: String? = null,
+
     @Column(nullable = false)
     val timestamp: LocalDateTime = LocalDateTime.now()
 )
