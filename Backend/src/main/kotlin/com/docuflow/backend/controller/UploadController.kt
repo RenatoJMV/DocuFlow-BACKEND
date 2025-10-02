@@ -3,6 +3,7 @@ package com.docuflow.backend.controller
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.DocumentRepository
+import com.docuflow.backend.service.GcsUtil
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -41,7 +42,9 @@ class UploadController {
 
         // 3. Subir archivo a Google Cloud Storage
         val bucketName = System.getenv("GCP_BUCKET_NAME")
+            ?: return ResponseEntity.status(500).body(mapOf("error" to "Bucket no configurado"))
         val credentialsJson = System.getenv("GCP_KEY_JSON")
+            ?: return ResponseEntity.status(500).body(mapOf("error" to "Credenciales no configuradas"))
         val gcsPath = GcsUtil.uploadFile(file, bucketName, credentialsJson)
 
         // 4. Guardar metadatos en la BD
@@ -50,11 +53,11 @@ class UploadController {
             fileType = file.contentType ?: "desconocido",
             filePath = gcsPath, // Guardamos la ruta de GCS
             size = file.size
-            )
-            documentRepository.save(document)
+        )
+        documentRepository.save(document)
 
-            println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
+        println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
 
-            return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
+        return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
     }
 }

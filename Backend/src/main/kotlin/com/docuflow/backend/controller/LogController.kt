@@ -170,8 +170,9 @@ class LogController(
     }
 
     private fun getLogDetails(log: LogEntry, filename: String?): String {
-        if (!log.details.isNullOrBlank()) {
-            return log.details
+        val details = log.details
+        if (!details.isNullOrBlank()) {
+            return details
         }
         val action = log.action
         val target = log.targetUsername ?: log.username
