@@ -28,6 +28,7 @@ class UserManagementController(
             mapOf<String, Any>(
                 "id" to (user.id ?: 0L),
                 "username" to user.username,
+                "name" to (user.fullName ?: user.username),
                 "email" to "${user.username}@docuflow.com", // Email simulado
                 "role" to (user.role ?: "viewer"),
                 "status" to "active",
@@ -58,6 +59,7 @@ class UserManagementController(
         val userData = mapOf<String, Any>(
             "id" to (user.id ?: 0L),
             "username" to user.username,
+            "name" to (user.fullName ?: user.username),
             "email" to "${user.username}@docuflow.com",
             "role" to (user.role ?: "viewer"),
             "status" to "active",
@@ -145,6 +147,7 @@ class UserManagementController(
             "user" to mapOf<String, Any>(
                 "id" to (user.id ?: 0L),
                 "username" to user.username,
+                "name" to (user.fullName ?: user.username),
                 "role" to (user.role ?: "viewer"),
                 "permissions" to user.permissions
             )

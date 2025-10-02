@@ -31,10 +31,10 @@ class FilesController(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Any> {
         // Validar token JWT
-        val token = authHeader?.removePrefix("Bearer ") 
+        val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
+
+        JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val files = documentRepository.findAll()
@@ -48,10 +48,10 @@ class FilesController(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Any> {
         // Validar token JWT
-        val token = authHeader?.removePrefix("Bearer ") 
+        val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
+
+        JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val file = documentRepository.findById(id)
@@ -140,10 +140,10 @@ class FilesController(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Any> {
         // Validar token JWT
-        val token = authHeader?.removePrefix("Bearer ") 
+        val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
+
+        JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val document = documentRepository.findById(id)
@@ -284,5 +284,95 @@ class FilesController(
                 "error" to "Error al eliminar el archivo: ${e.message}"
             ))
         }
+    }
+
+    // 🆕 Estadísticas resumidas de archivos para compatibilidad con el frontend
+    @GetMapping("/stats")
+    fun getFileStats(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
+
+        val username = JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
+
+        val documents = documentRepository.findAll()
+        val totalFiles = documents.size
+        val totalSize = documents.sumOf { it.size }
+        val largestFile = documents.maxByOrNull { it.size }
+
+        val distribution = documents.groupBy { doc ->
+            doc.fileType.lowercase().let { type ->
+                when {
+                    type.contains("pdf") -> "pdf"
+                    type.contains("word") || type.contains("doc") -> "doc"
+                    type.contains("excel") || type.contains("sheet") || type.contains("xls") -> "spreadsheet"
+                    type.contains("image") || type.contains("png") || type.contains("jpg") || type.contains("jpeg") -> "image"
+                    else -> "other"
+                }
+            }
+        }.mapValues { it.value.size }
+
+        return ResponseEntity.ok(mapOf<String, Any>(
+            "success" to true,
+            "totalFiles" to totalFiles,
+            "totalSizeBytes" to totalSize,
+            "formattedTotalSize" to formatSize(totalSize),
+            "averageFileSizeBytes" to if (totalFiles > 0) totalSize / totalFiles else 0L,
+            "largestFile" to (largestFile?.let {
+                mapOf<String, Any>(
+                    "id" to (it.id ?: 0L),
+                    "filename" to it.filename,
+                    "size" to it.size,
+                    "formattedSize" to formatSize(it.size)
+                )
+            } ?: emptyMap<String, Any>()),
+            "fileTypeDistribution" to distribution
+        ))
+    }
+
+    // 🆕 Conteo rápido de archivos
+    @GetMapping("/count")
+    fun getFileCount(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
+
+        val username = JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
+
+        val count = documentRepository.count()
+        return ResponseEntity.ok(mapOf<String, Any>(
+            "success" to true,
+            "count" to count
+        ))
+    }
+
+    // 🆕 Tamaño total de almacenamiento utilizado por documentos
+    @GetMapping("/total-size")
+    fun getTotalFileSize(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
+
+        val username = JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
+
+        val totalSize = documentRepository.findAll().sumOf { it.size }
+        return ResponseEntity.ok(mapOf<String, Any>(
+            "success" to true,
+            "totalSizeBytes" to totalSize,
+            "formattedTotalSize" to formatSize(totalSize)
+        ))
+    }
+
+    private fun formatSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        return String.format("%.2f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
     }
 }

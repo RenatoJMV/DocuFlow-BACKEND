@@ -1,25 +1,31 @@
 package com.docuflow.backend.security
 
+import com.docuflow.backend.service.TokenService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 
 @Configuration
-class SecurityConfig {
+class SecurityConfig(
+    private val tokenService: TokenService
+) {
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .cors { } 
-            .addFilterBefore(JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests {
                 it.requestMatchers("/login").permitAll()
+                it.requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                 it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 // Proteger todas las rutas /files
                 it.requestMatchers("/files/**").authenticated()
@@ -32,6 +38,12 @@ class SecurityConfig {
 
         return http.build()
     }
+
+    @Bean
+    fun jwtAuthenticationFilter() = JwtAuthenticationFilter(tokenService)
+
+    @Bean
+    fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
