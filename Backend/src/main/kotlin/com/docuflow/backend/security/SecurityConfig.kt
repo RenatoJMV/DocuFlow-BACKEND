@@ -22,10 +22,12 @@ class SecurityConfig(
         http
             .csrf { it.disable() }
             .cors { } 
+            .sessionManagement { it.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS) }
             .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests {
                 it.requestMatchers("/login").permitAll()
                 it.requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
+                it.requestMatchers("/health", "/health/**").permitAll()
                 it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 // Proteger todas las rutas /files
                 it.requestMatchers("/files/**").authenticated()
@@ -35,6 +37,7 @@ class SecurityConfig(
             }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
+            .logout { it.disable() }
 
         return http.build()
     }
