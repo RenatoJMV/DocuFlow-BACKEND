@@ -32,13 +32,13 @@ class FilesController(
     ): ResponseEntity<Any> {
         // Validar token JWT
         val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
         
         val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val files = documentRepository.findAll()
-        return ResponseEntity.ok(mapOf("success" to true, "files" to files))
+        return ResponseEntity.ok(mapOf<String, Any>("success" to true, "files" to files))
     }
 
     // 🟢 Obtener metadatos por ID
@@ -49,16 +49,16 @@ class FilesController(
     ): ResponseEntity<Any> {
         // Validar token JWT
         val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
         
         val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val file = documentRepository.findById(id)
         return if (file.isPresent) {
-            ResponseEntity.ok(mapOf("success" to true, "file" to file.get()))
+            ResponseEntity.ok(mapOf<String, Any>("success" to true, "file" to file.get()))
         } else {
-            ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado"))
+            ResponseEntity.status(404).body(mapOf<String, Any>("error" to "Archivo no encontrado"))
         }
     }
 
@@ -79,23 +79,23 @@ class FilesController(
             // Validar archivo
             if (file.isEmpty) {
                 return ResponseEntity.badRequest()
-                    .body(mapOf("error" to "El archivo está vacío"))
+                    .body(mapOf<String, Any>("error" to "El archivo está vacío"))
             }
 
             // Validar tamaño (máximo 20MB)
             if (file.size > 20 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
-                    .body(mapOf("error" to "El archivo excede el tamaño máximo de 20MB"))
+                    .body(mapOf<String, Any>("error" to "El archivo excede el tamaño máximo de 20MB"))
             }
 
             // Obtener credenciales y nombre del bucket desde variables de entorno
             val bucketName = System.getenv("GCP_BUCKET_NAME") 
                 ?: return ResponseEntity.status(500)
-                    .body(mapOf("error" to "GCP_BUCKET_NAME no configurado"))
+                    .body(mapOf<String, Any>("error" to "GCP_BUCKET_NAME no configurado"))
             
             val credentialsJson = System.getenv("GCP_KEY_JSON") 
                 ?: return ResponseEntity.status(500)
-                    .body(mapOf("error" to "GCP_KEY_JSON no configurado"))
+                    .body(mapOf<String, Any>("error" to "GCP_KEY_JSON no configurado"))
 
             // Subir archivo a Google Cloud Storage
             val gcsPath = GcsUtil.uploadFile(file, bucketName, credentialsJson)
@@ -119,10 +119,10 @@ class FilesController(
                 )
             )
 
-            ResponseEntity.ok(mapOf(
+            ResponseEntity.ok(mapOf<String, Any>(
                 "success" to true, 
                 "mensaje" to "Archivo subido exitosamente",
-                "fileId" to savedDocument.id,
+                "fileId" to (savedDocument.id ?: 0L),
                 "filename" to savedDocument.filename
             ))
         } catch (e: Exception) {
@@ -141,14 +141,14 @@ class FilesController(
     ): ResponseEntity<Any> {
         // Validar token JWT
         val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
         
         val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val document = documentRepository.findById(id)
         if (document.isEmpty) {
-            return ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado"))
+            return ResponseEntity.status(404).body(mapOf<String, Any>("error" to "Archivo no encontrado"))
         }
 
         return try {
@@ -158,7 +158,7 @@ class FilesController(
             val match = regex.matchEntire(filePath)
             if (match == null) {
                 return ResponseEntity.status(500)
-                    .body(mapOf("error" to "Ruta de archivo inválida"))
+                    .body(mapOf<String, Any>("error" to "Ruta de archivo inválida"))
             }
             val bucketName = match.groupValues[1]
             val fileName = match.groupValues[2]
@@ -166,7 +166,7 @@ class FilesController(
             // Obtener credenciales de GCS
             val credentialsJson = System.getenv("GCP_KEY_JSON") 
                 ?: return ResponseEntity.status(500)
-                    .body(mapOf("error" to "GCP_KEY_JSON no configurado"))
+                    .body(mapOf<String, Any>("error" to "GCP_KEY_JSON no configurado"))
 
             val storage: Storage = StorageOptions.newBuilder()
                 .setCredentials(
@@ -203,7 +203,7 @@ class FilesController(
                 .body(fileBytes)
         } catch (e: Exception) {
             e.printStackTrace()
-            ResponseEntity.status(500).body(mapOf(
+            ResponseEntity.status(500).body(mapOf<String, Any>(
                 "error" to "Error al descargar el archivo: ${e.message}"
             ))
         }
@@ -217,14 +217,14 @@ class FilesController(
     ): ResponseEntity<Map<String, Any>> {
         // Validar token JWT
         val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
         
         val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+            ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val document = documentRepository.findById(id)
         if (document.isEmpty) {
-            return ResponseEntity.status(404).body(mapOf("error" to "Archivo no encontrado"))
+            return ResponseEntity.status(404).body(mapOf<String, Any>("error" to "Archivo no encontrado"))
         }
 
         return try {
@@ -274,13 +274,13 @@ class FilesController(
                 )
             )
 
-            ResponseEntity.ok(mapOf(
+            ResponseEntity.ok(mapOf<String, Any>(
                 "success" to true, 
                 "mensaje" to "Archivo eliminado correctamente"
             ))
         } catch (e: Exception) {
             e.printStackTrace()
-            ResponseEntity.status(500).body(mapOf(
+            ResponseEntity.status(500).body(mapOf<String, Any>(
                 "error" to "Error al eliminar el archivo: ${e.message}"
             ))
         }
