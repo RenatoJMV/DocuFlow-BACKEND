@@ -128,7 +128,7 @@ class UserProfileController(
             var updatedUser = user
             if (updates.containsKey("role") && user.role == "admin") {
                 val newRole = updates["role"] as? String
-                if (newRole in listOf("admin", "colaborador", "viewer")) {
+                if (newRole != null && newRole in listOf("admin", "colaborador", "viewer")) {
                     updatedUser = updatedUser.copy(role = newRole)
                 }
             }

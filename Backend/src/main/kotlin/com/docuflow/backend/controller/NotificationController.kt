@@ -2,12 +2,13 @@ package com.docuflow.backend.controller
 
 import com.docuflow.backend.model.Notification
 import com.docuflow.backend.repository.NotificationRepository
+import com.docuflow.backend.repository.UserRepository
 import com.docuflow.backend.security.JwtUtil
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
-import javax.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletRequest
 
 @RestController
 @RequestMapping("/notifications")
@@ -16,6 +17,9 @@ class NotificationController {
 
     @Autowired
     private lateinit var notificationRepository: NotificationRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
 
     @Autowired
     private lateinit var jwtUtil: JwtUtil
@@ -198,7 +202,8 @@ class NotificationController {
                     notification.targetRole == userRole
                 }
                 .filter { notification ->
-                    notification.expiresAt == null || notification.expiresAt.isAfter(LocalDateTime.now())
+                    val expiresAt = notification.expiresAt
+                    expiresAt == null || expiresAt.isAfter(LocalDateTime.now())
                 }
             
             val response = notifications.map { notification ->
@@ -332,11 +337,12 @@ class NotificationController {
 
     private fun getUsernameFromToken(request: HttpServletRequest): String {
         val token = request.getHeader("Authorization")?.substring(7)
-        return jwtUtil.extractUsername(token!!)
+        return jwtUtil.validateToken(token!!) ?: throw IllegalArgumentException("Token inválido")
     }
 
     private fun getUserRoleFromToken(request: HttpServletRequest): String {
-        val token = request.getHeader("Authorization")?.substring(7)
-        return jwtUtil.extractClaim(token!!, "role") as? String ?: "USER"
+        val username = getUsernameFromToken(request)
+        val user = userRepository.findByUsername(username)
+        return user?.role ?: "USER"
     }
 }

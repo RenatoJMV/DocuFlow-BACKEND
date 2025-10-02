@@ -34,7 +34,7 @@ data class Notification(
     val isGlobal: Boolean = false,
 
     @Column(nullable = false)
-    val isActive: Boolean = true,
+    var isActive: Boolean = true,
 
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),

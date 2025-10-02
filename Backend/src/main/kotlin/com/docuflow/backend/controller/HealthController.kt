@@ -57,7 +57,7 @@ class HealthController(
             val errorStatus = mapOf<String, Any>(
                 "status" to "DOWN",
                 "timestamp" to LocalDateTime.now(),
-                "error" to e.message,
+                "error" to (e.message ?: "Error desconocido"),
                 "application" to "DocuFlow Backend"
             )
             return ResponseEntity.status(503).body(errorStatus)
@@ -103,7 +103,7 @@ class HealthController(
         } catch (e: Exception) {
             mapOf(
                 "status" to "DOWN",
-                "error" to e.message,
+                "error" to (e.message ?: "Error desconocido"),
                 "timestamp" to LocalDateTime.now()
             )
         }
@@ -126,7 +126,7 @@ class HealthController(
         } catch (e: Exception) {
             mapOf(
                 "status" to "DOWN",
-                "error" to e.message,
+                "error" to (e.message ?: "Error desconocido"),
                 "timestamp" to LocalDateTime.now()
             )
         }
