@@ -29,7 +29,7 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val requestingUser = JwtUtil.validateToken(token) 
+        val _ = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
@@ -103,7 +103,7 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val requestingUser = JwtUtil.validateToken(token) 
+        val _ = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
@@ -151,7 +151,7 @@ class ExportController(
         val token = authHeader?.removePrefix("Bearer ") 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
         
-        val requestingUser = JwtUtil.validateToken(token) 
+        val _ = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {

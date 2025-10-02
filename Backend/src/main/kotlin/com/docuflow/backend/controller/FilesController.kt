@@ -34,7 +34,7 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        val username = JwtUtil.validateToken(token)
+        val _ = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val files = documentRepository.findAll()

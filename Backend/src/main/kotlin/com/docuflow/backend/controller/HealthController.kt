@@ -173,7 +173,7 @@ class HealthController(
     private fun determineOverallStatus(
         dbStatus: Map<String, Any>,
         repoStatus: Map<String, Any>,
-        externalStatus: Map<String, Any>
+        @Suppress("UNUSED_PARAMETER") externalStatus: Map<String, Any>
     ): String {
         return when {
             dbStatus["status"] != "UP" -> "DOWN"

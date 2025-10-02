@@ -20,7 +20,7 @@ object GcsUtil {
             .service
     }
     
-    fun uploadFile(file: MultipartFile, bucketName: String, credentialsJson: String): String {
+    fun uploadFile(file: MultipartFile, bucketName: String): String {
         val storage = getStorageService()
         val blobInfo = BlobInfo.newBuilder(bucketName, file.originalFilename!!).build()
         storage.create(blobInfo, file.bytes)
