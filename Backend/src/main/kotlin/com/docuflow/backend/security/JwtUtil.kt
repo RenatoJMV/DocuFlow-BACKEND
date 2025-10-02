@@ -3,6 +3,7 @@ package com.docuflow.backend.security
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTDecodeException
+import org.springframework.stereotype.Component
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -43,5 +44,24 @@ object JwtUtil {
     fun isExpired(token: String): Boolean {
         val expiration = getExpiration(token) ?: return true
         return expiration.isBefore(LocalDateTime.now(ZoneOffset.UTC))
+    }
+}
+
+@Component
+class JwtUtilService {
+    fun generateToken(username: String, expiresInMillis: Long = 3_600_000): String {
+        return JwtUtil.generateToken(username, expiresInMillis)
+    }
+
+    fun validateToken(token: String): String? {
+        return JwtUtil.validateToken(token)
+    }
+
+    fun getExpiration(token: String): LocalDateTime? {
+        return JwtUtil.getExpiration(token)
+    }
+
+    fun isExpired(token: String): Boolean {
+        return JwtUtil.isExpired(token)
     }
 }

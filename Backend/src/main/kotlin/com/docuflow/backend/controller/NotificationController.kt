@@ -3,7 +3,7 @@ package com.docuflow.backend.controller
 import com.docuflow.backend.model.Notification
 import com.docuflow.backend.repository.NotificationRepository
 import com.docuflow.backend.repository.UserRepository
-import com.docuflow.backend.security.JwtUtil
+import com.docuflow.backend.security.JwtUtilService
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -22,7 +22,7 @@ class NotificationController {
     private lateinit var userRepository: UserRepository
 
     @Autowired
-    private lateinit var jwtUtil: JwtUtil
+    private lateinit var jwtUtil: JwtUtilService
 
     // DTO para crear notificaciones
     data class NotificationRequestDTO(
