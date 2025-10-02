@@ -34,7 +34,7 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        JwtUtil.validateToken(token)
+        val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val files = documentRepository.findAll()
@@ -51,7 +51,7 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        JwtUtil.validateToken(token)
+        val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val file = documentRepository.findById(id)
@@ -143,7 +143,7 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        JwtUtil.validateToken(token)
+        val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val document = documentRepository.findById(id)
