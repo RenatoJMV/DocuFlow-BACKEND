@@ -20,6 +20,7 @@
 - Nuevo endpoint `GET /api/gcs/stats` con métricas reales de almacenamiento y detección de archivos huérfanos.
 - `GcsUtil` exige credenciales válidas y propaga errores de Google Cloud en vez de devolver listas vacías.
 - Seguridad actualizada para proteger las rutas `/api/gcs/**` y mantener compatibilidad con `/gcs/**`.
+- Los documentos ahora registran la fecha/hora de subida (`uploadDate`) automáticamente con formato ISO 8601.
 
 ## Estado de autenticación
 Todos los endpoints (salvo `/health` y `/auth/*`) requieren un JWT válido. Cuando la respuesta incluya `{ "success": false, "error": "Token inválido" }`, es necesario renovar el token con `/auth/refresh`.
@@ -61,6 +62,22 @@ Todos los endpoints (salvo `/health` y `/auth/*`) requieren un JWT válido. Cuan
 | `GET` | `/files/total-size` | Bytes almacenados según la BD |
 
 > Tamaño máximo de carga: 20 MB. Formatos permitidos en `/files` y `/upload`: `pdf`, `docx`, `xlsx`.
+
+### Estructura de respuesta
+Los objetos devueltos por `GET /files` y `GET /files/{id}` contienen, entre otros, los atributos:
+
+```json
+{
+  "id": 1,
+  "filename": "ejemplo.pdf",
+  "fileType": "application/pdf",
+  "filePath": "gs://docuflow-storage/ejemplo.pdf",
+  "size": 123456,
+  "uploadDate": "2025-10-05T18:45:12.345678"
+}
+```
+
+`uploadDate` se genera en el servidor cuando el registro es creado. Para archivos previos a la migración este campo puede aparecer `null` hasta que se reprocese la metadata.
 
 ## 3. Subida rápida (`/upload`)
 Alias simplificado para clientes legacy que solo necesitan subir un archivo con el campo `file`. Usa la misma lógica de validación y almacenamiento que `/files`.

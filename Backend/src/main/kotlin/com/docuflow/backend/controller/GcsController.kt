@@ -4,6 +4,7 @@ import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.service.GcsUtil
 import com.google.cloud.storage.StorageException
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,6 +20,8 @@ class GcsController(
     private val gcsUtil: GcsUtil,
     private val documentRepository: DocumentRepository
 ) {
+
+    private val logger = LoggerFactory.getLogger(GcsController::class.java)
 
     @GetMapping("/files")
     fun getFilesFromGcs(
@@ -109,12 +112,15 @@ class GcsController(
                 )
             )
         } catch (ex: IllegalStateException) {
+            logger.warn("GCS stats - configuración incompleta: {}", ex.message)
             ResponseEntity.ok(stubStatsResponse(ex.message ?: "Configuración de GCS incompleta"))
         } catch (ex: StorageException) {
+            logger.error("GCS stats - error al comunicarse con GCS (bucket={})", bucketName, ex)
             ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
                 errorStatsResponse("Error al comunicarse con GCS: ${ex.message}")
             )
         } catch (ex: Exception) {
+            logger.error("GCS stats - error inesperado (bucket={})", bucketName, ex)
             ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
                 errorStatsResponse("Error inesperado al consultar GCS: ${ex.message}")
             )

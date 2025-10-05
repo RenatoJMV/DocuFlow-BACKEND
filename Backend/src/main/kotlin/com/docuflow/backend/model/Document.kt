@@ -1,6 +1,8 @@
 package com.docuflow.backend.model
 
 import jakarta.persistence.*
+import org.hibernate.annotations.CreationTimestamp
+import java.time.LocalDateTime
 
 @Entity
 @Table(name = "documents")
@@ -19,5 +21,9 @@ data class Document(
     val filePath: String,
 
     @Column(nullable = false)
-    val size: Long // 🆕 Tamaño del archivo en bytes
+    val size: Long,
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    val uploadDate: LocalDateTime? = null
 )   
