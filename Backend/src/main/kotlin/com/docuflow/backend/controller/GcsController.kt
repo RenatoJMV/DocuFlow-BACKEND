@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -123,6 +124,115 @@ class GcsController(
             logger.error("GCS stats - error inesperado (bucket={})", bucketName, ex)
             ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
                 errorStatsResponse("Error inesperado al consultar GCS: ${ex.message}")
+            )
+        }
+    }
+
+    @PostMapping("/files/reconcile")
+    fun reconcileFiles(
+        @RequestHeader("Authorization") authHeader: String?
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(mapOf("error" to "Token faltante"))
+
+        JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(mapOf("error" to "Token inválido"))
+
+        val bucketName = System.getenv("GCP_BUCKET_NAME")?.takeIf { it.isNotBlank() }
+            ?: return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(mapOf(
+                    "success" to false,
+                    "error" to "GCP_BUCKET_NAME no configurado",
+                    "timestamp" to LocalDateTime.now()
+                ))
+
+        return try {
+            val blobs = gcsUtil.listAllFilesInBucket(bucketName)
+            val documents = documentRepository.findAll()
+
+            val blobNames = blobs.map { it.name }.toSet()
+
+            val documentsMissingInGcs = documents.filter { document ->
+                val objectName = extractObjectName(document.filePath)
+                objectName == null || objectName !in blobNames
+            }
+
+            val documentsToDelete = documentsMissingInGcs.filter { it.id != null }
+            if (documentsToDelete.isNotEmpty()) {
+                documentRepository.deleteAll(documentsToDelete)
+            }
+            val removedDocumentSummaries = documentsMissingInGcs.map { document ->
+                mapOf(
+                    "id" to (document.id ?: 0L),
+                    "filename" to document.filename,
+                    "filePath" to document.filePath
+                )
+            }
+
+            val registeredNames = documents
+                .filterNot { documentsMissingInGcs.contains(it) }
+                .mapNotNull { extractObjectName(it.filePath) }
+                .toSet()
+            val orphanedBlobs = blobs.filter { blob -> blob.name !in registeredNames }
+
+            val deletedGcsObjects = mutableListOf<String>()
+            val failedGcsObjects = mutableListOf<String>()
+
+            orphanedBlobs.forEach { blob ->
+                try {
+                    val deleted = gcsUtil.deleteFile(bucketName, blob.name)
+                    if (deleted) {
+                        deletedGcsObjects += blob.name
+                    } else {
+                        failedGcsObjects += blob.name
+                    }
+                } catch (ex: StorageException) {
+                    failedGcsObjects += blob.name
+                    logger.error(
+                        "GCS reconcile - error al eliminar blob {} en bucket {}",
+                        blob.name,
+                        bucketName,
+                        ex
+                    )
+                }
+            }
+
+            val responseBody = mapOf(
+                "success" to true,
+                "bucket" to bucketName,
+                "deletedDatabaseRecords" to removedDocumentSummaries.size,
+                "deletedGcsObjects" to deletedGcsObjects.size,
+                "failedGcsDeletions" to failedGcsObjects.size,
+                "docsRemovedFromDb" to removedDocumentSummaries,
+                "gcsObjectsDeleted" to deletedGcsObjects,
+                "gcsObjectsSkipped" to failedGcsObjects,
+                "timestamp" to LocalDateTime.now()
+            )
+
+            if (failedGcsObjects.isEmpty()) {
+                ResponseEntity.ok(responseBody)
+            } else {
+                ResponseEntity.status(HttpStatus.ACCEPTED).body(responseBody)
+            }
+        } catch (ex: StorageException) {
+            logger.error("GCS reconcile - error al comunicarse con GCS (bucket={})", bucketName, ex)
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                mapOf(
+                    "success" to false,
+                    "error" to "Error al comunicarse con GCS: ${ex.message}",
+                    "timestamp" to LocalDateTime.now()
+                )
+            )
+        } catch (ex: Exception) {
+            logger.error("GCS reconcile - error inesperado (bucket={})", bucketName, ex)
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                mapOf(
+                    "success" to false,
+                    "error" to (ex.message ?: "Error inesperado durante la reconciliación"),
+                    "timestamp" to LocalDateTime.now()
+                )
             )
         }
     }
