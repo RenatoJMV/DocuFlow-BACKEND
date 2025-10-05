@@ -1,233 +1,130 @@
-# Guía de Integración para el Frontend
+# Guía de integración Frontend ↔ Backend
 
-Este documento resume los endpoints disponibles en el backend de DocuFlow y cómo debe consumirlos la SPA. Todo el backend está desplegado en Render; las rutas se construyen con la variable `BACKEND_URL`.
+Esta guía resume los endpoints disponibles en DocuFlow y el flujo recomendado para la SPA. Todas las URLs deben construirse con la variable `BACKEND_URL` (por ejemplo, `https://docuflow-backend.onrender.com`).
 
 ## 1. Autenticación
+- **Base**: `${BACKEND_URL}/auth`
+- **Formato de error**: `{ "error": "Mensaje descriptivo", "details": { … opcional … } }`
+- **Tokens**: access token (1h) + refresh token (14d)
 
-Todas las rutas de autenticación están bajo `${BACKEND_URL}/auth`. Utilizan JSON y retornan errores en el formato:
+| Acción | Método | Endpoint | Notas |
+| --- | --- | --- | --- |
+| Registro | `POST` | `/auth/register` | Campos requeridos: `email`, `password`, `name` |
+| Login | `POST` | `/auth/login` | Normaliza `username` a minúsculas. Autocreación de admin si coincide con `APP_USER/APP_PASS` |
+| Refresh | `POST` | `/auth/refresh` | Recibe `{ "refreshToken": "..." }` |
+| Logout | `POST` | `/auth/logout` | Requiere header `Authorization: Bearer` |
 
+### Respuesta de login
 ```json
 {
-  "error": "Mensaje descriptivo",
-  "details": { ... opcional ... }
+  "success": true,
+  "token": "<jwt>",
+  "refreshToken": "<refresh-token>",
+  "expiresIn": 3600,
+  "user": {
+    "username": "usuario@example.com",
+    "name": "Nombre Apellido",
+    "role": "viewer",
+    "permissions": ["files.read", "files.download", "comments.read"]
+  },
+  "message": "Login exitoso"
 }
 ```
 
-### 1.1 Registro
-- **Método:** `POST`
-- **Endpoint:** `/auth/register`
-- **Requiere token?:** No
-- **Body esperado:**
-  ```json
-  {
-    "email": "usuario@example.com",
-    "password": "Contraseña123",
-    "name": "Nombre completo"
-  }
-  ```
-- **Validaciones:**
-  - Email obligatorio con formato válido (`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
-  - Password de mínimo 8 caracteres
-  - Nombre de mínimo 2 caracteres
-  - 400 si el email ya existe
-  - 422 si fallan las reglas anteriores
-- **Respuesta exitosa (201):**
-  ```json
-  {
-    "success": true,
-    "message": "User registered successfully"
-  }
-  ```
-- **Rol y permisos iniciales:**
-  - Rol: `viewer`
-  - Permisos: `files.read`, `files.download`, `comments.read`
+### Buenas prácticas frontend
+1. Guardar `token` y `refreshToken` en almacenamiento seguro (`localStorage` o `sessionStorage`).
+2. Interceptar respuestas 401 e intentar `/auth/refresh` una sola vez; si falla, redirigir a login.
+3. En logout, llamar al backend y luego limpiar el almacenamiento local.
 
-### 1.2 Login
-- **Método:** `POST`
-- **Endpoint:** `/auth/login`
-- **Requiere token?:** No
-- **Body esperado:**
-  ```json
-  {
-    "username": "usuario@example.com",
-    "password": "Contraseña123"
-  }
-  ```
-- **Notas:**
-  - El backend normaliza el `username` a minúsculas.
-  - Si coincide con `APP_USER`/`APP_PASS`, se crea (o reutiliza) un usuario admin con permisos completos.
-  - Contraseñas antiguas sin hash se re-hashean automáticamente al primer login exitoso.
-- **Respuesta exitosa (200):**
-  ```json
-  {
-    "success": true,
-    "token": "<JWT acceso válido 1 hora>",
-    "refreshToken": "<token de refresco válido 14 días>",
-    "expiresIn": 3600,
-    "user": {
-      "username": "usuario@example.com",
-      "name": "Nombre completo",
-      "role": "viewer",
-      "permissions": ["files.read", "files.download", "comments.read"]
-    },
-    "message": "Login exitoso"
-  }
-  ```
-- **Errores:**
-  - 400 si faltan campos
-  - 401 si credenciales inválidas
+## 2. Archivos y compatibilidad SPA
+- **Base**: `${BACKEND_URL}/files`
+- Todos los endpoints devuelven `{ "success": true, ... }` cuando la operación es exitosa.
 
-### 1.3 Logout
-- **Método:** `POST`
-- **Endpoint:** `/auth/logout`
-- **Requiere token?:** Sí (`Authorization: Bearer <token>`)
-- **Comportamiento:**
-  - Revoca el access token (lista negra en tabla `revoked_tokens`).
-  - Revoca todos los refresh tokens activos del usuario (`refresh_tokens.revoked = true`).
-  - Registra un log con acción `logout`.
-- **Respuesta exitosa (200):**
-  ```json
-  {
-    "success": true,
-    "message": "Logged out successfully"
-  }
-  ```
-- **Errores:** 401 si el token es faltante, inválido o ya revocado.
+| Endpoint | Descripción |
+| --- | --- |
+| `GET /files` | Lista documentos registrados en la BD |
+| `GET /files/{id}` | Devuelve metadatos (`id`, `filename`, `fileType`, `size`, `filePath`) |
+| `POST /files` | Subida con campo `file` (máx. 20 MB) |
+| `GET /files/{id}/download` | Descarga el binario desde GCS |
+| `DELETE /files/{id}` | Elimina en GCS + BD |
+| `GET /files/stats` | Métricas resumidas (total, más grande, distribución por tipo) |
+| `GET /files/count` | Conteo rápido |
+| `GET /files/total-size` | Tamaño agregado en bytes y texto |
 
-### 1.4 Refresh
-- **Método:** `POST`
-- **Endpoint:** `/auth/refresh`
-- **Requiere token?:** No (usa refresh token)
-- **Body esperado:**
-  ```json
-  {
-    "refreshToken": "<token de refresco vigente>"
-  }
-  ```
-- **Comportamiento:**
-  - Valida que el refresh token exista, no esté revocado ni vencido.
-  - Revoca el refresh token utilizado (modelo rolling).
-  - Genera un nuevo access token (1 hora) y un nuevo refresh token (14 días).
-- **Respuesta exitosa (200):**
-  ```json
-  {
-    "success": true,
-    "token": "<nuevo JWT>",
-    "refreshToken": "<nuevo refresh token>",
-    "expiresIn": 3600
-  }
-  ```
-- **Errores:**
-  - 400 si no se envía el campo
-  - 401 si el refresh token es inválido o expirado (detalle `code = INVALID_REFRESH_TOKEN`)
+> El endpoint legacy `POST /upload` sigue disponible para compatibilidad: usa el mismo flujo de subida con validaciones de extensión (`pdf`, `docx`, `xlsx`).
 
-### 1.5 Buenas prácticas en el frontend
-- Guardar `token` y `refreshToken` en `localStorage` (claves sugeridas: `authToken`, `token`, `refreshToken`).
-- Al recibir un 401 en llamadas protegidas, intentar `POST /auth/refresh`. Si el refresh falla, limpiar storage y redirigir a login.
-- En logout, enviar la solicitud al backend y luego limpiar `localStorage`.
+## 3. Dashboard y métricas
+- **Base**: `${BACKEND_URL}/api/dashboard`
+- Respuestas JSON con campos reales; si alguna agregación no tiene datos, el backend devuelve colecciones vacías en lugar de demo data.
 
-## 2. Endpoints de archivos (compatibilidad SPA)
+Endpoints clave:
+- `GET /stats`: totales de archivos, usuarios, comentarios, logs y almacenamiento.
+- `GET /activity`: últimas 20 acciones registradas.
+- `GET /recent-files?limit=5`: lista de archivos nuevos (orden descendente).
+- `GET /files/stats`: tipos de archivo, mayor tamaño, archivo más reciente.
+- `GET /downloads/today`: número de descargas realizadas el día en curso.
 
-Todos bajo `${BACKEND_URL}/files`, con `Authorization: Bearer <token>`.
+## 4. Gestión de usuarios
+- **Base recomendada**: `${BACKEND_URL}/api/admin/users`
+- Objeto de respuesta incluye `performedBy` con datos del admin que ejecuta la acción.
 
-### 2.1 Estadísticas rápidas
-1. `GET /files/stats`
-   ```json
-   {
-     "success": true,
-     "totalFiles": 32,
-     "totalSizeBytes": 48972544,
-     "formattedTotalSize": "46.72 MB",
-     "averageFileSizeBytes": 1530392,
-     "largestFile": {
-       "id": 12,
-       "filename": "reporte.pdf",
-       "size": 9812736,
-       "formattedSize": "9.36 MB"
-     },
-     "fileTypeDistribution": {
-       "pdf": 12,
-       "doc": 6,
-       "spreadsheet": 5,
-       "image": 4,
-       "other": 5
-     }
-   }
-   ```
+| Acción | Método | Endpoint |
+| --- | --- | --- |
+| Listar usuarios | `GET` | `/api/admin/users` |
+| Obtener usuario | `GET` | `/api/admin/users/{id}` |
+| Crear usuario | `POST` | `/api/admin/users` |
+| Actualizar datos | `PUT` | `/api/admin/users/{id}` |
+| Actualizar contraseña | `PATCH` | `/api/admin/users/{id}/password` |
+| Actualizar permisos | `PATCH` | `/api/admin/users/{id}/permissions` |
+| Eliminar usuario | `DELETE` | `/api/admin/users/{id}` |
+| Consultar roles disponibles | `GET` | `/api/admin/users/roles` |
 
-2. `GET /files/count`
-   ```json
-   {
-     "success": true,
-     "count": 32
-   }
-   ```
+> La ruta histórica `/users` permanece activa pero migrar a `/api/admin/users` garantiza consistencia con la versión actual.
 
-3. `GET /files/total-size`
-   ```json
-   {
-     "success": true,
-     "totalSizeBytes": 48972544,
-     "formattedTotalSize": "46.72 MB"
-   }
-   ```
+## 5. Permisos
+- **Base**: `${BACKEND_URL}/permissions`
 
-> Nota: El frontend ya consumía `/api/dashboard/files/stats`; estos nuevos endpoints son alias sencillos alineados a la estructura esperada en la SPA.
+Endpoints relevantes:
+- `GET /modules`: catálogo completo de módulos y acciones (para construir UI de permisos).
+- `GET /user/{userId}`: permisos del usuario en formato granular (`{ module: { action: boolean } }`).
+- `PUT /user/{userId}`: actualiza permisos a partir de la lista granular que envíe el frontend.
+- `POST /check`: se usa para validar rápidamente si el usuario actual tiene un permiso puntual.
+- `GET /roles/permissions`: mapa de permisos por rol (admin, colaborador, viewer).
 
-### 2.2 Flujo CRUD existente (recordatorio)
-- `GET /files`
-- `GET /files/{id}`
-- `POST /files` (multipart `file`)
-- `GET /files/{id}/download`
-- `DELETE /files/{id}`
+## 6. Comentarios y tareas
+- **Base**: `${BACKEND_URL}/api/comments`
 
-Todos requieren el token y mantienen el formato `{ success: true, ... }`.
+| Endpoint | Uso |
+| --- | --- |
+| `GET /api/comments` | Lista general |
+| `GET /api/comments/document/{id}` | Filtra por documento |
+| `POST /api/comments` | Crea comentario o tarea (`isTask`, `assignees`) |
+| `PUT /api/comments/{id}` | Edita contenido/asignaciones |
+| `PUT /api/comments/{id}/assign` | Asigna usuarios |
+| `PUT /api/comments/{id}/complete` | Marca tarea completada |
+| `DELETE /api/comments/{id}` | Elimina |
 
-## 3. Otros endpoints de soporte
+Los campos `status`, `priority` y `completed` se derivan en el backend sin valores ficticios.
 
-### 3.1 Usuarios y roles
-Todos bajo `${BACKEND_URL}/users` (con token):
-- `GET /users` → Devuelve `name` (fullName) además de `username`.
-- `GET /users/{id}` → Incluye `name`.
-- `GET /users/roles`
-- `PUT /users/{id}/role`
-- `GET /users/{id}/permissions`
-- `PUT /users/{id}/permissions`
+## 7. Logs y exportaciones
+- Logs: `${BACKEND_URL}/api/logs` con paginación (`page`, `size`).
+- Exportaciones: `${BACKEND_URL}/export/{logs|files|stats}` con parámetro `format=csv|json`.
 
-### 3.2 Comentarios
-`${BACKEND_URL}/api/comments` + subrutas siguen intactas (create/edit/assign/delete/complete).
+## 8. GCS y métricas de almacenamiento
+- **Base**: `${BACKEND_URL}/api/gcs`
+- `GET /files`: devuelve todos los blobs reales del bucket.
+- `GET /stats`: usa `GCP_BUCKET_NAME`, `GCP_KEY_JSON` y (opcional) `GCP_TOTAL_STORAGE_BYTES` para calcular métricas.
+- Si la configuración está incompleta, la respuesta incluye `"ready": false` y un mensaje explicativo; no se exponen datos simulados.
 
-### 3.3 Dashboard & Logs
-`${BACKEND_URL}/api/dashboard/**` y `${BACKEND_URL}/api/logs/**` mantienen estructura y campos descritos anteriormente.
+## 9. Notificaciones
+- **Base**: `${BACKEND_URL}/notifications`
+- Operaciones principales: listar (`GET /notifications`), crear (`POST /notifications`), filtrar por tipo/prioridad y administrar (`/notifications/admin/all`, `/notifications/stats`).
+- Solo los usuarios con rol `ADMIN` pueden crear notificaciones globales o consultar estadísticas agregadas.
 
-## 4. Integración sugerida en la SPA
+## 10. Consideraciones adicionales
+- Usar siempre HTTPS en producción.
+- Los endpoints devuelven colecciones vacías cuando no hay datos reales; no se incluirán registros de demostración.
+- Verificar que el frontend envíe el header `Authorization` en todas las llamadas protegidas.
+- Mantener sincronizado el manejo de errores: `401` → intentar refresh, `403` → mostrar mensaje de permisos, `503` → reintentar o mostrar alerta de servicio.
 
-- **Registro:** `POST /auth/register` y mostrar mensaje de éxito.
-- **Inicio de sesión:** Guardar `token`, `refreshToken`, `user`.
-- **Middleware de autenticación:** Añadir `Authorization` a cada request; ante 401 intentar refresh.
-- **Logout:** Llamar a `/auth/logout`, luego limpiar storage.
-- **Actualización de dashboards:** Consumir `/files/stats`, `/files/count`, `/files/total-size` para alimentar widgets.
-- **Mostrado de usuarios:** Aprovechar el campo `name` para nombre completo.
-
-## 5. Notas operativas
-
-- El backend se ejecuta en Render; no es necesario correr Maven localmente para validar despliegues.
-- Hibernate (`spring.jpa.hibernate.ddl-auto=update`) se encarga de crear:
-  - Tabla `refresh_tokens`
-  - Tabla `revoked_tokens`
-  - Nueva columna `full_name` en `users`
-- Mantener configuradas las variables de entorno claves en Render:
-  - `JWT_SECRET`
-  - `APP_USER` / `APP_PASS` (opcional, para el administrador por defecto)
-  - Credenciales de PostgreSQL (`DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`)
-
-## 6. Resumen rápido para compartir
-
-1. **Registro:** `POST /auth/register` (valida email/password/name, responde 201 con mensaje)
-2. **Login:** `POST /auth/login` → `{ token, refreshToken, expiresIn, user }`
-3. **Logout:** `POST /auth/logout` (Bearer token) → revoca access+refresh
-4. **Refresh:** `POST /auth/refresh` con `refreshToken` → nuevos tokens
-5. **Estadísticas archivos:** `GET /files/stats`, `/files/count`, `/files/total-size`
-6. **Campos extra:** usuario ahora tiene `name` basado en `fullName`
-
-Comparte este archivo directamente con la persona/IA a cargo del frontend para alinear la integración.
+Última actualización: 4 de octubre de 2025.

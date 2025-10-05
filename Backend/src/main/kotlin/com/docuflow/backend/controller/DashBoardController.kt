@@ -23,7 +23,7 @@ class DashboardController(
 ) {
 
     @GetMapping("/stats")
-    fun getDashboardStats(): ResponseEntity<Map<String, Any>> {
+    fun getDashboardStats(): ResponseEntity<Map<String, Any?>> {
         try {
             val totalFiles = documentRepository.count()
             val totalUsers = userRepository.count()
@@ -39,7 +39,7 @@ class DashboardController(
             val recentActivities = logEntryRepository.findAll()
                 .count { it.timestamp.isAfter(LocalDateTime.now().minusDays(7)) }
             
-            val stats: Map<String, Any> = mapOf(
+            val stats: Map<String, Any?> = mapOf(
                 "totalFiles" to totalFiles,
                 "totalStorageUsed" to totalSize, // En bytes como espera el frontend
                 "totalUsers" to totalUsers,
@@ -55,7 +55,7 @@ class DashboardController(
             return ResponseEntity.ok(stats)
         } catch (e: Exception) {
             // Devolver estadísticas por defecto en caso de error
-            val defaultStats: Map<String, Any> = mapOf(
+            val defaultStats: Map<String, Any?> = mapOf(
                 "totalFiles" to 0,
                 "totalStorageUsed" to 0,
                 "totalUsers" to 0,
@@ -70,18 +70,18 @@ class DashboardController(
     }
 
     @GetMapping("/activity")
-    fun getRecentActivity(): ResponseEntity<List<Map<String, Any>>> {
+    fun getRecentActivity(): ResponseEntity<List<Map<String, Any?>>> {
         try {
             val recentLogs = logEntryRepository.findAll()
                 .sortedByDescending { it.timestamp }
                 .take(20)
                 .map { log ->
                     val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
-                    mapOf<String, Any>(
+                    mapOf<String, Any?>(
                         "id" to (log.id ?: 0L),
                         "action" to log.action,
                         "username" to log.username,
-                        "documentName" to (document?.filename ?: "Unknown"),
+                        "documentName" to document?.filename,
                         "timestamp" to log.timestamp,
                         "status" to getActionStatus(log.action),
                         "details" to getActionDetails(log.action, document?.filename)
@@ -91,20 +91,21 @@ class DashboardController(
             return ResponseEntity.ok(recentLogs)
         } catch (e: Exception) {
             // Devolver lista vacía en caso de error
-            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+            return ResponseEntity.ok(emptyList<Map<String, Any?>>())
         }
     }
 
     @GetMapping("/users")
-    fun getAllUsers(): ResponseEntity<List<Map<String, Any>>> {
+    fun getAllUsers(): ResponseEntity<List<Map<String, Any?>>> {
         val users = userRepository.findAll().map { user ->
-            mapOf<String, Any>(
+            mapOf<String, Any?>(
                 "id" to (user.id ?: 0L),
                 "username" to user.username,
-                "email" to (user.username + "@docuflow.com"), // Temporal
-                "role" to "user", // Por ahora role básico
-                "status" to "active",
-                "lastLogin" to LocalDateTime.now().minusDays((1..30).random().toLong())
+                "email" to user.username,
+                "fullName" to user.fullName,
+                "role" to user.role,
+                "status" to if (user.active) "active" else "inactive",
+                "lastLogin" to null
             )
         }
         return ResponseEntity.ok(users)
@@ -116,19 +117,19 @@ class DashboardController(
     }
 
     @GetMapping("/logs")
-    fun getAllLogs(): ResponseEntity<List<Map<String, Any>>> {
+    fun getAllLogs(): ResponseEntity<List<Map<String, Any?>>> {
         val logs = logEntryRepository.findAll().map { log ->
             val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
-            mapOf<String, Any>(
+            mapOf<String, Any?>(
                 "id" to (log.id ?: 0L),
                 "action" to log.action,
                 "username" to log.username,
                 "documentId" to (log.documentId ?: 0L),
-                "documentName" to (document?.filename ?: "Unknown"),
+                "documentName" to document?.filename,
                 "timestamp" to log.timestamp,
                 "level" to mapActionToLevel(log.action),
                 "details" to getActionDetails(log.action, document?.filename),
-                "ip" to "127.0.0.1" // Por ahora IP simulada
+                "ip" to null
             )
         }
         return ResponseEntity.ok(logs)
@@ -143,17 +144,16 @@ class DashboardController(
     }
 
     @GetMapping("/files")
-    fun getAllFiles(): ResponseEntity<List<Map<String, Any>>> {
+    fun getAllFiles(): ResponseEntity<List<Map<String, Any?>>> {
         val files = documentRepository.findAll().map { doc ->
-            mapOf<String, Any>(
+            mapOf<String, Any?>(
                 "id" to (doc.id ?: 0L),
                 "filename" to doc.filename,
                 "fileType" to doc.fileType,
                 "size" to doc.size,
                 "filePath" to doc.filePath,
-                "uploadDate" to LocalDateTime.now().minusDays((1..30).random().toLong()), // Temporal
                 "formattedSize" to formatFileSize(doc.size),
-                "extension" to doc.filename.substringAfterLast(".").uppercase()
+                "extension" to doc.filename.substringAfterLast('.', "").uppercase().ifEmpty { null }
             )
         }
         return ResponseEntity.ok(files)
@@ -178,12 +178,13 @@ class DashboardController(
     }
 
     private fun getActionDetails(action: String, filename: String?): String {
+        val suffix = filename?.takeIf { it.isNotBlank() }?.let { " '$it'" } ?: ""
         return when (action) {
-            "upload" -> "Archivo '$filename' subido exitosamente"
-            "download" -> "Archivo '$filename' descargado"
-            "delete" -> "Archivo '$filename' eliminado"
+            "upload" -> "Archivo$suffix subido exitosamente"
+            "download" -> "Archivo$suffix descargado"
+            "delete" -> "Archivo$suffix eliminado"
             "login" -> "Usuario autenticado correctamente"
-            else -> "Acción '$action' realizada"
+            else -> "Acción '$action' realizada${if (suffix.isNotEmpty()) " sobre$suffix" else ""}"
         }
     }
 
@@ -198,7 +199,7 @@ class DashboardController(
     }
 
     @GetMapping("/files/stats")
-    fun getDashboardFileStats(): ResponseEntity<Map<String, Any>> {
+    fun getDashboardFileStats(): ResponseEntity<Map<String, Any?>> {
         try {
             val allFiles = documentRepository.findAll()
             val totalFiles = allFiles.size.toLong()
@@ -219,23 +220,23 @@ class DashboardController(
                 }
                 .mapValues { it.value.size }
 
-            val stats: Map<String, Any> = mapOf(
+            val stats: Map<String, Any?> = mapOf(
                 "totalFiles" to totalFiles,
                 "totalSize" to totalSize,
-                "largestFile" to (largestFile?.filename ?: "N/A"),
+                "largestFile" to largestFile?.filename,
                 "largestFileSize" to (largestFile?.size ?: 0L),
-                "mostRecentFile" to (mostRecentFile?.filename ?: "N/A"),
+                "mostRecentFile" to mostRecentFile?.filename,
                 "fileTypeDistribution" to fileTypeDistribution
             )
             
             return ResponseEntity.ok(stats)
         } catch (e: Exception) {
-            val defaultStats: Map<String, Any> = mapOf(
+            val defaultStats: Map<String, Any?> = mapOf(
                 "totalFiles" to 0,
                 "totalSize" to 0,
-                "largestFile" to "N/A",
+                "largestFile" to null,
                 "largestFileSize" to 0,
-                "mostRecentFile" to "N/A",
+                "mostRecentFile" to null,
                 "fileTypeDistribution" to mapOf<String, Int>()
             )
             return ResponseEntity.ok(defaultStats)
@@ -243,39 +244,39 @@ class DashboardController(
     }
 
     @GetMapping("/recent-files")
-    fun getRecentFiles(@RequestParam(defaultValue = "5") limit: Int): ResponseEntity<List<Map<String, Any>>> {
+    fun getRecentFiles(@RequestParam(defaultValue = "5") limit: Int): ResponseEntity<List<Map<String, Any?>>> {
         try {
             val recentFiles = documentRepository.findAll()
                 .sortedByDescending { it.id ?: 0L }
                 .take(limit)
                 .map { doc ->
-                    mapOf<String, Any>(
+                    mapOf<String, Any?>(
                         "id" to (doc.id ?: 0L),
                         "filename" to doc.filename,
                         "fileType" to doc.fileType,
                         "size" to doc.size,
-                        "uploadedAt" to LocalDateTime.now().minusDays((1..7).random().toLong())
+                        "uploadedAt" to null
                     )
                 }
             
             return ResponseEntity.ok(recentFiles)
         } catch (e: Exception) {
-            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+            return ResponseEntity.ok(emptyList<Map<String, Any?>>())
         }
     }
 
     @GetMapping("/recent-activities")
-    fun getRecentActivities(@RequestParam(defaultValue = "10") limit: Int): ResponseEntity<List<Map<String, Any>>> {
+    fun getRecentActivities(@RequestParam(defaultValue = "10") limit: Int): ResponseEntity<List<Map<String, Any?>>> {
         try {
             val recentActivities = logEntryRepository.findAll()
                 .sortedByDescending { it.timestamp }
                 .take(limit)
                 .map { log ->
                     val document = documentRepository.findById(log.documentId ?: 0L).orElse(null)
-                    mapOf<String, Any>(
+                    mapOf<String, Any?>(
                         "id" to (log.id ?: 0L),
                         "type" to getActivityType(log.action),
-                        "file" to (document?.filename ?: "Unknown"),
+                        "file" to document?.filename,
                         "action" to getActivityDescription(log.action, document?.filename),
                         "user" to log.username,
                         "timestamp" to log.timestamp,
@@ -285,7 +286,7 @@ class DashboardController(
             
             return ResponseEntity.ok(recentActivities)
         } catch (e: Exception) {
-            return ResponseEntity.ok(emptyList<Map<String, Any>>())
+            return ResponseEntity.ok(emptyList<Map<String, Any?>>())
         }
     }
 
@@ -301,11 +302,12 @@ class DashboardController(
     }
 
     private fun getActivityDescription(action: String, filename: String?): String {
+        val suffix = filename?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""
         return when (action) {
-            "upload" -> "Subió archivo ${filename ?: "desconocido"}"
-            "download" -> "Descargó archivo ${filename ?: "desconocido"}"
-            "delete" -> "Eliminó archivo ${filename ?: "desconocido"}"
-            "comment" -> "Agregó comentario en ${filename ?: "documento"}"
+            "upload" -> "Subió archivo$suffix"
+            "download" -> "Descargó archivo$suffix"
+            "delete" -> "Eliminó archivo$suffix"
+            "comment" -> if (suffix.isBlank()) "Agregó un comentario" else "Agregó comentario en$suffix"
             "login" -> "Inició sesión en el sistema"
             else -> "Realizó acción: $action"
         }

@@ -11,47 +11,37 @@ import java.io.ByteArrayInputStream
 
 @Service
 object GcsUtil {
-    
+
     private fun getStorageService(): Storage {
-        val credentialsJson = System.getenv("GCP_KEY_JSON") ?: ""
+        val credentialsJson = System.getenv("GCP_KEY_JSON")?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("Credenciales de GCS no configuradas")
+
         return StorageOptions.newBuilder()
             .setCredentials(ServiceAccountCredentials.fromStream(ByteArrayInputStream(credentialsJson.toByteArray())))
             .build()
             .service
     }
-    
+
     fun uploadFile(file: MultipartFile, bucketName: String): String {
         val storage = getStorageService()
         val blobInfo = BlobInfo.newBuilder(bucketName, file.originalFilename!!).build()
         storage.create(blobInfo, file.bytes)
         return "gs://$bucketName/${file.originalFilename}"
     }
-    
+
     fun listAllFilesInBucket(bucketName: String): List<Blob> {
-        return try {
-            val storage = getStorageService()
-            val blobs = storage.list(bucketName)
-            blobs.iterateAll().toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+        val storage = getStorageService()
+        val blobs = storage.list(bucketName)
+        return blobs.iterateAll().toList()
     }
-    
+
     fun getFileInfo(bucketName: String, fileName: String): Blob? {
-        return try {
-            val storage = getStorageService()
-            storage.get(bucketName, fileName)
-        } catch (e: Exception) {
-            null
-        }
+        val storage = getStorageService()
+        return storage.get(bucketName, fileName)
     }
-    
+
     fun deleteFile(bucketName: String, fileName: String): Boolean {
-        return try {
-            val storage = getStorageService()
-            storage.delete(bucketName, fileName)
-        } catch (e: Exception) {
-            false
-        }
+        val storage = getStorageService()
+        return storage.delete(bucketName, fileName)
     }
 }

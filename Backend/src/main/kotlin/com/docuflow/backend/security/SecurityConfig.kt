@@ -29,6 +29,8 @@ class SecurityConfig(
                 it.requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                 it.requestMatchers("/health", "/health/**").permitAll()
                 it.requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                // Proteger rutas de GCS
+                it.requestMatchers("/api/gcs/**", "/gcs/**").authenticated()
                 // Proteger todas las rutas /files
                 it.requestMatchers("/files/**").authenticated()
                 // Mantener compatibilidad con /documents por si aún se usa

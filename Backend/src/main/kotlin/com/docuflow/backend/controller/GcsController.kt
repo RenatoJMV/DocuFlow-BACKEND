@@ -1,26 +1,34 @@
 package com.docuflow.backend.controller
 
-import com.docuflow.backend.service.GcsUtil
+import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.security.JwtUtil
+import com.docuflow.backend.service.GcsUtil
+import com.google.cloud.storage.StorageException
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 import java.time.LocalDateTime
 
 @RestController
-@RequestMapping("/gcs")
+@RequestMapping(value = ["/api/gcs", "/gcs"])
 class GcsController(
-    private val gcsUtil: GcsUtil
+    private val gcsUtil: GcsUtil,
+    private val documentRepository: DocumentRepository
 ) {
 
     @GetMapping("/files")
     fun getFilesFromGcs(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Map<String, Any>> {
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token faltante"))
+
+        JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token inválido"))
 
         try {
             val bucketName = System.getenv("GCP_BUCKET_NAME") ?: "docuflow-files"
@@ -52,7 +60,7 @@ class GcsController(
             return ResponseEntity.ok(response)
             
         } catch (e: Exception) {
-            return ResponseEntity.status(500).body(mapOf(
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(mapOf(
                 "success" to false,
                 "error" to "Error al obtener archivos desde GCS: ${e.message}",
                 "timestamp" to LocalDateTime.now()
@@ -60,64 +68,56 @@ class GcsController(
         }
     }
 
-    @GetMapping("/files/stats")
+    @GetMapping("/stats")
     fun getGcsStats(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Map<String, Any>> {
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token faltante"))
 
-        try {
-            val bucketName = System.getenv("GCP_BUCKET_NAME") ?: "docuflow-files"
+        JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token inválido"))
+
+        val bucketName = System.getenv("GCP_BUCKET_NAME")?.takeIf { it.isNotBlank() }
+            ?: return ResponseEntity.ok(stubStatsResponse("Bucket no configurado"))
+
+        return try {
             val files = gcsUtil.listAllFilesInBucket(bucketName)
-            
-            val totalSize = files.sumOf { it.size }
-            val totalFiles = files.size
-            val largestFile = files.maxByOrNull { it.size }
-            
-            val typeDistribution = files.groupBy { 
-                it.contentType?.split("/")?.get(0) ?: "unknown" 
-            }.mapValues { it.value.size }
-            
-            val sizeDistribution = files.groupBy {
-                when {
-                    it.size < 1024 * 1024 -> "< 1MB"
-                    it.size < 10 * 1024 * 1024 -> "1-10MB"
-                    it.size < 100 * 1024 * 1024 -> "10-100MB"
-                    else -> "> 100MB"
-                }
-            }.mapValues { it.value.size }
-            
-            val response: Map<String, Any> = mapOf(
-                "success" to true,
-                "bucket" to bucketName,
-                "stats" to mapOf(
-                    "totalFiles" to totalFiles,
-                    "totalSizeBytes" to totalSize,
-                    "totalSizeFormatted" to formatFileSize(totalSize),
-                    "averageFileSize" to if (totalFiles > 0) totalSize / totalFiles else 0,
-                    "largestFile" to mapOf(
-                        "name" to (largestFile?.name ?: ""),
-                        "size" to (largestFile?.size ?: 0),
-                        "sizeFormatted" to formatFileSize(largestFile?.size ?: 0)
-                    ),
-                    "typeDistribution" to typeDistribution,
-                    "sizeDistribution" to sizeDistribution
-                ),
-                "timestamp" to LocalDateTime.now()
+            val usedStorage = files.sumOf { it.size }
+            val totalStorage = System.getenv("GCP_TOTAL_STORAGE_BYTES")?.toLongOrNull()?.takeIf { it > 0 }
+                ?: usedStorage
+            val storageUsagePercent = if (totalStorage > 0) {
+                ((usedStorage.toDouble() / totalStorage.toDouble()) * 100).coerceAtMost(100.0)
+            } else {
+                0.0
+            }
+
+            val registeredFiles = documentRepository.findAll()
+            val registeredNames = registeredFiles.mapNotNull { extractObjectName(it.filePath) }.toSet()
+            val orphanedFiles = files.count { blob -> blob.name !in registeredNames }
+
+            ResponseEntity.ok(
+                mapOf(
+                    "ready" to true,
+                    "bucket" to bucketName,
+                    "usedStorage" to usedStorage,
+                    "totalStorage" to totalStorage,
+                    "storageUsagePercent" to storageUsagePercent,
+                    "fileCount" to files.size,
+                    "orphanedFiles" to orphanedFiles,
+                    "timestamp" to LocalDateTime.now()
+                )
             )
-            
-            return ResponseEntity.ok(response)
-            
-        } catch (e: Exception) {
-            return ResponseEntity.status(500).body(mapOf(
-                "success" to false,
-                "error" to "Error al obtener estadísticas de GCS: ${e.message}",
-                "timestamp" to LocalDateTime.now()
-            ))
+        } catch (ex: IllegalStateException) {
+            ResponseEntity.ok(stubStatsResponse(ex.message ?: "Configuración de GCS incompleta"))
+        } catch (ex: StorageException) {
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                errorStatsResponse("Error al comunicarse con GCS: ${ex.message}")
+            )
+        } catch (ex: Exception) {
+            ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                errorStatsResponse("Error inesperado al consultar GCS: ${ex.message}")
+            )
         }
     }
 
@@ -125,11 +125,11 @@ class GcsController(
     fun getOrphanedFiles(
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Map<String, Any>> {
-        val token = authHeader?.removePrefix("Bearer ") 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
-        
-        val username = JwtUtil.validateToken(token) 
-            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token faltante"))
+
+        JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Token inválido"))
 
         try {
             // Este endpoint identifica archivos en GCS que no están registrados en la BD
@@ -154,16 +154,39 @@ class GcsController(
         }
     }
 
-    private fun formatFileSize(bytes: Long): String {
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        var size = bytes.toDouble()
-        var unitIndex = 0
-        
-        while (size >= 1024 && unitIndex < units.size - 1) {
-            size /= 1024
-            unitIndex++
+    private fun stubStatsResponse(message: String): Map<String, Any> = mapOf(
+        "ready" to false,
+        "bucket" to (System.getenv("GCP_BUCKET_NAME") ?: ""),
+        "usedStorage" to 0L,
+        "totalStorage" to 0L,
+        "storageUsagePercent" to 0.0,
+        "fileCount" to 0,
+        "orphanedFiles" to 0,
+        "message" to message,
+        "timestamp" to LocalDateTime.now()
+    )
+
+    private fun errorStatsResponse(message: String): Map<String, Any> = mapOf(
+        "ready" to false,
+        "error" to message,
+        "timestamp" to LocalDateTime.now()
+    )
+
+    private fun extractObjectName(filePath: String): String? = try {
+        val uri = URI(filePath)
+        when (uri.scheme) {
+            "gs" -> uri.path.trimStart('/').takeIf { it.isNotBlank() }
+            "https" -> {
+                val normalizedPath = uri.path.trimStart('/')
+                when {
+                    uri.host?.contains("storage.googleapis.com") == true ->
+                        normalizedPath.substringAfter("/", normalizedPath).takeIf { it.isNotBlank() }
+                    else -> normalizedPath.takeIf { it.isNotBlank() }
+                }
+            }
+            else -> filePath.substringAfterLast('/')
         }
-        
-        return "%.1f %s".format(size, units[unitIndex])
+    } catch (_: Exception) {
+        filePath.substringAfterLast('/')
     }
 }
