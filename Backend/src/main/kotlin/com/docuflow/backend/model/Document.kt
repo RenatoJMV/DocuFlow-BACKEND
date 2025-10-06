@@ -1,5 +1,7 @@
 package com.docuflow.backend.model
 
+import com.fasterxml.jackson.annotation.JsonFormat
+import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
@@ -24,6 +26,8 @@ data class Document(
     val size: Long,
 
     @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    val uploadDate: LocalDateTime? = null
+    @Column(name = "upload_date", nullable = false, updatable = false)
+    @JsonProperty("uploadedAt")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+    val uploadedAt: LocalDateTime? = null
 )   
