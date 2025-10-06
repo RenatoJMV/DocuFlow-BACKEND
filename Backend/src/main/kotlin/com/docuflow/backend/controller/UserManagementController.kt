@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*
 import jakarta.validation.Valid
 
 @RestController
-@RequestMapping(value = ["/api/admin/users", "/users"])
+@RequestMapping(value = ["/api/admin/users", "/users", "/api/users"])
 class UserManagementController(
     private val adminUserService: AdminUserService
 ) {
