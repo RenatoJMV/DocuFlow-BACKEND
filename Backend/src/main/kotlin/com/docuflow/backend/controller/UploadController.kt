@@ -4,11 +4,11 @@ import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.model.Document
 import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.service.GcsUtil
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
-import java.io.File
 
 @RestController
 @RequestMapping("/upload")
@@ -16,6 +16,8 @@ class UploadController {
 
     @Autowired
     lateinit var documentRepository: DocumentRepository
+
+    private val logger = LoggerFactory.getLogger(UploadController::class.java)
     @PostMapping
     fun uploadFile(
         @RequestHeader("Authorization") authHeader: String?,
@@ -43,8 +45,10 @@ class UploadController {
         // 3. Subir archivo a Google Cloud Storage
         val bucketName = System.getenv("GCP_BUCKET_NAME")
             ?: return ResponseEntity.status(500).body(mapOf("error" to "Bucket no configurado"))
-        val credentialsJson = System.getenv("GCP_KEY_JSON")
-            ?: return ResponseEntity.status(500).body(mapOf("error" to "Credenciales no configuradas"))
+        val credentialsConfigured = System.getenv("GCP_KEY_JSON")?.isNotBlank() == true
+        if (!credentialsConfigured) {
+            return ResponseEntity.status(500).body(mapOf("error" to "Credenciales no configuradas"))
+        }
         val gcsPath = GcsUtil.uploadFile(file, bucketName)
 
         // 4. Guardar metadatos en la BD
@@ -56,7 +60,7 @@ class UploadController {
         )
         documentRepository.save(document)
 
-        println("Usuario $username subió ${file.originalFilename} (${file.size} bytes) a $gcsPath")
+        logger.info("Usuario {} subió {} ({} bytes) a {}", username, file.originalFilename, file.size, gcsPath)
 
         return ResponseEntity.ok(mapOf("mensaje" to "Archivo subido exitosamente"))
     }

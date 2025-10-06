@@ -2,6 +2,7 @@ package com.docuflow.backend.controller
 
 import com.docuflow.backend.repository.UserRepository
 import com.docuflow.backend.security.JwtUtil
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
@@ -22,6 +23,8 @@ class PermissionController(
     private val userRepository: UserRepository
 ) {
 
+    private val logger = LoggerFactory.getLogger(PermissionController::class.java)
+
     @GetMapping("/modules")
     fun getAvailableModules(
         @RequestHeader("Authorization") authHeader: String?
@@ -32,7 +35,9 @@ class PermissionController(
         val username = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
-        val modules = mapOf(
+    logger.debug("Usuario {} solicitó la lista de módulos disponibles", username)
+
+    val modules = mapOf(
             "files" to mapOf(
                 "name" to "Gestión de Archivos",
                 "actions" to listOf(
@@ -108,6 +113,8 @@ class PermissionController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
+            logger.debug("Usuario {} consultó permisos del usuario {}", requestingUser, userId)
+
             val user = userRepository.findById(userId).orElse(null)
                 ?: return ResponseEntity.status(404).body(mapOf("error" to "Usuario no encontrado"))
 
@@ -143,6 +150,8 @@ class PermissionController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
+            logger.debug("Usuario {} actualiza permisos de {}", requestingUser, userId)
+
             val user = userRepository.findById(userId).orElse(null)
                 ?: return ResponseEntity.status(404).body(mapOf("error" to "Usuario no encontrado"))
 
@@ -184,6 +193,14 @@ class PermissionController(
 
             val hasPermission = checkUserPermission(user.permissions.toList(), permission.module, permission.action)
 
+            logger.debug(
+                "Usuario {} verificó permiso {}.{} (resultado={})",
+                username,
+                permission.module,
+                permission.action,
+                hasPermission
+            )
+
             return ResponseEntity.ok(mapOf(
                 "success" to true,
                 "hasPermission" to hasPermission,
@@ -210,7 +227,9 @@ class PermissionController(
         val username = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
-        val rolePermissions = mapOf(
+    logger.debug("Usuario {} solicitó el mapa de permisos por rol", username)
+
+    val rolePermissions = mapOf(
             "admin" to mapOf(
                 "name" to "Administrador",
                 "permissions" to listOf("download", "delete", "comment", "edit", "share", "admin", "view_logs", "manage_users"),

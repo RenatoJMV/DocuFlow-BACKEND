@@ -4,6 +4,7 @@ import com.docuflow.backend.model.LogEntry
 import com.docuflow.backend.repository.LogEntryRepository
 import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.security.JwtUtil
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
@@ -14,6 +15,8 @@ class LogController(
     private val logEntryRepository: LogEntryRepository,
     private val documentRepository: DocumentRepository
 ) {
+
+    private val logger = LoggerFactory.getLogger(LogController::class.java)
 
     @GetMapping
     fun getLogs(
@@ -28,6 +31,7 @@ class LogController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
+            logger.debug("Usuario {} solicitó logs (page={}, size={})", username, page, size)
             val allLogs = logEntryRepository.findAll()
                 .sortedByDescending { it.timestamp }
             
@@ -84,6 +88,7 @@ class LogController(
             ?: return ResponseEntity.status(401).body(emptyList())
 
         try {
+            logger.debug("Usuario {} solicitó logs recientes (limit={})", username, limit)
             val recentLogs = logEntryRepository.findAll()
                 .sortedByDescending { it.timestamp }
                 .take(limit)
@@ -118,6 +123,7 @@ class LogController(
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
 
         try {
+            logger.debug("Usuario {} solicitó el conteo total de logs", username)
             val totalCount = logEntryRepository.count()
             return ResponseEntity.ok(mapOf("count" to totalCount))
         } catch (e: Exception) {
@@ -138,6 +144,7 @@ class LogController(
             ?: return ResponseEntity.status(401).body(emptyList())
 
         try {
+            logger.debug("Usuario {} consultó los logs del usuario {}", requestingUser, username)
             val userLogs = logEntryRepository.findAll()
                 .filter { it.username == username }
                 .sortedByDescending { it.timestamp }

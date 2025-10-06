@@ -6,6 +6,7 @@ import com.docuflow.backend.repository.LogEntryRepository
 import com.docuflow.backend.model.LogEntry
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.service.GcsUtil
+import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.google.auth.oauth2.ServiceAccountCredentials
@@ -25,6 +26,8 @@ class FilesController(
     @Autowired private val logEntryRepository: LogEntryRepository
 ) {
 
+    private val logger = LoggerFactory.getLogger(FilesController::class.java)
+
     // 🟢 Listar todos los archivos
     @GetMapping
     fun listFiles(
@@ -34,9 +37,10 @@ class FilesController(
         val token = authHeader?.removePrefix("Bearer ")
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token faltante"))
 
-        @Suppress("UNUSED_VARIABLE")
-        val validatedUser = JwtUtil.validateToken(token)
+        val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
+
+        logger.debug("Usuario {} listó todos los archivos", username)
 
         val files = documentRepository.findAll()
         return ResponseEntity.ok(mapOf<String, Any>("success" to true, "files" to files))
@@ -55,7 +59,8 @@ class FilesController(
         val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
-        val file = documentRepository.findById(id)
+    val file = documentRepository.findById(id)
+    logger.debug("Usuario {} consultó metadatos del archivo {}", username, id)
         return if (file.isPresent) {
             ResponseEntity.ok(mapOf<String, Any>("success" to true, "file" to file.get()))
         } else {
@@ -94,9 +99,11 @@ class FilesController(
                 ?: return ResponseEntity.status(500)
                     .body(mapOf<String, Any>("error" to "GCP_BUCKET_NAME no configurado"))
             
-            val credentialsJson = System.getenv("GCP_KEY_JSON") 
-                ?: return ResponseEntity.status(500)
+            val credentialsConfigured = System.getenv("GCP_KEY_JSON")?.isNotBlank() == true
+            if (!credentialsConfigured) {
+                return ResponseEntity.status(500)
                     .body(mapOf<String, Any>("error" to "GCP_KEY_JSON no configurado"))
+            }
 
             // Subir archivo a Google Cloud Storage
             val gcsPath = GcsUtil.uploadFile(file, bucketName)
@@ -120,6 +127,8 @@ class FilesController(
                 )
             )
 
+            logger.info("Usuario {} subió el archivo {} ({} bytes)", username, savedDocument.filename, savedDocument.size)
+
             ResponseEntity.ok(mapOf<String, Any>(
                 "success" to true, 
                 "mensaje" to "Archivo subido exitosamente",
@@ -127,9 +136,10 @@ class FilesController(
                 "filename" to savedDocument.filename
             ))
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.error("Error al subir archivo {}", file.originalFilename, e)
             ResponseEntity.status(500).body(mapOf(
-                "error" to "Error al subir el archivo: ${e.message}"
+                "error" to (e.message ?: "Error al subir el archivo"),
+                "timestamp" to LocalDateTime.now()
             ))
         }
     }
@@ -195,6 +205,8 @@ class FilesController(
                     timestamp = LocalDateTime.now()
                 )
             )
+
+            logger.debug("Usuario {} descargó el archivo {}", username, id)
 
             // Devolver el archivo
             ResponseEntity.ok()
@@ -298,7 +310,7 @@ class FilesController(
         val username = JwtUtil.validateToken(token)
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
-        val documents = documentRepository.findAll()
+    val documents = documentRepository.findAll()
         val totalFiles = documents.size
         val totalSize = documents.sumOf { it.size }
         val largestFile = documents.maxByOrNull { it.size }
@@ -314,6 +326,8 @@ class FilesController(
                 }
             }
         }.mapValues { it.value.size }
+
+        logger.debug("Usuario {} consultó estadísticas de archivos", username)
 
         return ResponseEntity.ok(mapOf<String, Any>(
             "success" to true,
@@ -345,6 +359,8 @@ class FilesController(
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val count = documentRepository.count()
+        logger.debug("Usuario {} consultó el conteo total de archivos", username)
+
         return ResponseEntity.ok(mapOf<String, Any>(
             "success" to true,
             "count" to count
@@ -363,6 +379,8 @@ class FilesController(
             ?: return ResponseEntity.status(401).body(mapOf<String, Any>("error" to "Token inválido"))
 
         val totalSize = documentRepository.findAll().sumOf { it.size }
+        logger.debug("Usuario {} consultó el tamaño total de almacenamiento", username)
+
         return ResponseEntity.ok(mapOf<String, Any>(
             "success" to true,
             "totalSizeBytes" to totalSize,

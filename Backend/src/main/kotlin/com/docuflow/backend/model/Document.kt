@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.persistence.*
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 @Entity
 @Table(name = "documents")
@@ -29,5 +31,12 @@ data class Document(
     @Column(name = "upload_date", nullable = false, updatable = false)
     @JsonProperty("uploadedAt")
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
-    val uploadedAt: LocalDateTime? = null
-)   
+    var uploadedAt: LocalDateTime? = null
+) {
+    @PrePersist
+    fun touchUploadedAt() {
+        if (uploadedAt == null) {
+            uploadedAt = LocalDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS)
+        }
+    }
+}

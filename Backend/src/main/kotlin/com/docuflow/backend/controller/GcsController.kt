@@ -39,12 +39,14 @@ class GcsController(
             val files = gcsUtil.listAllFilesInBucket(bucketName)
             
             val filesInfo = files.map { blob ->
+                val createdEpochMs = blob.createTimeOffsetDateTime?.toInstant()?.toEpochMilli()
+                val updatedEpochMs = blob.updateTimeOffsetDateTime?.toInstant()?.toEpochMilli()
                 mapOf<String, Any>(
                     "name" to blob.name,
                     "size" to blob.size,
                     "contentType" to (blob.contentType ?: "unknown"),
-                    "created" to blob.createTime,
-                    "updated" to blob.updateTime,
+                    "created" to (createdEpochMs ?: 0L),
+                    "updated" to (updatedEpochMs ?: 0L),
                     "md5Hash" to (blob.md5 ?: ""),
                     "generation" to blob.generation,
                     "isDirectory" to blob.isDirectory,
