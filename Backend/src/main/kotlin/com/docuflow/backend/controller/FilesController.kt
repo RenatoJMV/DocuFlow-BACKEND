@@ -1,13 +1,14 @@
 package com.docuflow.backend.controller
 
 import com.docuflow.backend.model.Document
+import com.docuflow.backend.model.LogEntry
 import com.docuflow.backend.repository.DocumentRepository
 import com.docuflow.backend.repository.LogEntryRepository
-import com.docuflow.backend.model.LogEntry
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.service.GcsUtil
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import com.google.auth.oauth2.ServiceAccountCredentials
@@ -15,8 +16,8 @@ import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import com.google.cloud.storage.BlobId
 import java.io.ByteArrayInputStream
-import org.springframework.http.HttpHeaders
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.HttpHeaders
 import org.springframework.web.multipart.MultipartFile
 import java.time.LocalDateTime
 
@@ -47,8 +48,40 @@ class FilesController(
         return ResponseEntity.ok(mapOf<String, Any>("success" to true, "files" to files))
     }
 
+    // 🆕 Archivos recientes
+    @GetMapping("/recent")
+    fun getRecentFiles(
+        @RequestHeader("Authorization") authHeader: String?,
+        @RequestParam(name = "limit", defaultValue = "5") limit: Int
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+
+        val username = JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        val safeLimit = limit.coerceIn(1, 50)
+        val recentFiles = documentRepository.findAllByOrderByUploadedAtDesc(PageRequest.of(0, safeLimit))
+
+        logger.debug(
+            "Usuario {} solicitó archivos recientes (limit={}) → {} resultados",
+            username,
+            safeLimit,
+            recentFiles.size
+        )
+
+        return ResponseEntity.ok(
+            mapOf(
+                "success" to true,
+                "requestedLimit" to limit,
+                "appliedLimit" to safeLimit,
+                "files" to recentFiles
+            )
+        )
+    }
+
     // 🟢 Obtener metadatos por ID
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     fun getFile(
         @PathVariable id: Long,
         @RequestHeader("Authorization") authHeader: String?
@@ -154,7 +187,7 @@ class FilesController(
     }
 
     // 🟢 Descargar un archivo desde Google Cloud Storage
-    @GetMapping("/{id}/download")
+    @GetMapping("/{id:\\d+}/download")
     fun downloadFile(
         @PathVariable id: Long,
         @RequestHeader("Authorization") authHeader: String?
@@ -232,7 +265,7 @@ class FilesController(
     }
 
     // 🟢 Eliminar un archivo (de GCS y de la BD)
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:\\d+}")
     fun deleteFile(
         @PathVariable id: Long,
         @RequestHeader("Authorization") authHeader: String?
