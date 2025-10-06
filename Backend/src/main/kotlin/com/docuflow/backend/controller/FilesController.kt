@@ -6,6 +6,7 @@ import com.docuflow.backend.repository.LogEntryRepository
 import com.docuflow.backend.model.LogEntry
 import com.docuflow.backend.security.JwtUtil
 import com.docuflow.backend.service.GcsUtil
+import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -71,6 +72,7 @@ class FilesController(
     // 🆕 Subir un archivo a Google Cloud Storage
     @PostMapping
     fun uploadFile(
+        request: HttpServletRequest,
         @RequestParam("file") file: MultipartFile,
         @RequestHeader("Authorization") authHeader: String?
     ): ResponseEntity<Map<String, Any>> {
@@ -80,6 +82,13 @@ class FilesController(
         
         val username = JwtUtil.validateToken(token) 
             ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        logger.debug(
+            "Solicitud de subida recibida: user={}, contentType={}, length={}",
+            username,
+            request.contentType,
+            request.contentLengthLong
+        )
 
         return try {
             // Validar archivo

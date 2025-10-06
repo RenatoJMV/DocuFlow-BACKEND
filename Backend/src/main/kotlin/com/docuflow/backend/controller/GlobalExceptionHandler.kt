@@ -1,5 +1,6 @@
 package com.docuflow.backend.controller
 
+import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -15,8 +16,15 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(MultipartException::class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    fun handleMultipartException(ex: MultipartException): ResponseEntity<Map<String, Any>> {
-        logger.warn("Solicitud multipart inválida: {}", ex.message)
+    fun handleMultipartException(ex: MultipartException, request: HttpServletRequest): ResponseEntity<Map<String, Any>> {
+        logger.warn(
+            "Solicitud multipart inválida en {} {} - contentType={}, length={}, mensaje={}",
+            request.method,
+            request.requestURI,
+            request.contentType,
+            request.contentLengthLong,
+            ex.message
+        )
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(
                 mapOf(
