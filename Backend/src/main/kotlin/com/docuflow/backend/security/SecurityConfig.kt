@@ -55,7 +55,7 @@ class SecurityConfig(
         configuration.allowedOriginPatterns = listOf(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
-            "http://127.0.0.1:3000", 
+            "http://127.0.0.1:3000",
             "http://localhost:3000",
             "https://renatojmv.github.io",
             "https://docuflow-frontend.onrender.com",
@@ -63,10 +63,17 @@ class SecurityConfig(
             "https://touched-included-elephant.ngrok-free.app",
             "https://holapex9.github.io"
         )
-        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-        configuration.allowedHeaders = listOf("*")
+        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+        configuration.allowedHeaders = listOf(
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Requested-With"
+        )
         configuration.allowCredentials = true
-        configuration.exposedHeaders = listOf("Authorization", "Content-Type")
+        configuration.exposedHeaders = listOf("Authorization", "Content-Type", "Content-Disposition")
+    configuration.maxAge = 3600L
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/**", configuration)
         return source
