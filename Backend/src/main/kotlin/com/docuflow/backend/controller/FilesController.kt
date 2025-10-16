@@ -48,6 +48,51 @@ class FilesController(
         return ResponseEntity.ok(mapOf<String, Any>("success" to true, "files" to files))
     }
 
+    // 🔍 Buscar archivos por nombre
+    @GetMapping("/search")
+    fun searchFiles(
+        @RequestHeader("Authorization") authHeader: String?,
+        @RequestParam("q") rawQuery: String?,
+        @RequestParam(name = "limit", defaultValue = "10") limit: Int
+    ): ResponseEntity<Map<String, Any>> {
+        val token = authHeader?.removePrefix("Bearer ")
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token faltante"))
+
+        val username = JwtUtil.validateToken(token)
+            ?: return ResponseEntity.status(401).body(mapOf("error" to "Token inválido"))
+
+        val query = rawQuery?.trim()
+        if (query.isNullOrEmpty()) {
+            return ResponseEntity.badRequest().body(mapOf(
+                "error" to "El parámetro de búsqueda 'q' es obligatorio"
+            ))
+        }
+
+        val safeLimit = limit.coerceIn(1, 50)
+        val results = documentRepository.findByFilenameContainingIgnoreCase(
+            query,
+            PageRequest.of(0, safeLimit)
+        )
+
+        logger.debug(
+            "Usuario {} buscó archivos con query='{}' (limit={}) → {} resultados",
+            username,
+            query,
+            safeLimit,
+            results.size
+        )
+
+        return ResponseEntity.ok(
+            mapOf(
+                "success" to true,
+                "query" to query,
+                "requestedLimit" to limit,
+                "appliedLimit" to safeLimit,
+                "files" to results
+            )
+        )
+    }
+
     // 🆕 Archivos recientes
     @GetMapping("/recent")
     fun getRecentFiles(

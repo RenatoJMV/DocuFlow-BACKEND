@@ -8,4 +8,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface DocumentRepository : JpaRepository<Document, Long> {
 	fun findAllByOrderByUploadedAtDesc(pageable: Pageable): List<Document>
+	fun findByFilenameContainingIgnoreCase(keyword: String, pageable: Pageable): List<Document>
 }
